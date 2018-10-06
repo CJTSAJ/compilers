@@ -24,6 +24,8 @@ void adjust(void)
 * You can add C declarations of your own below.
 */
 
+int commentCount = 0;
+
 /* @function: getstr
  * @input: a string literal
  * @output: the string value for the input which has all the escape sequences
@@ -55,6 +57,8 @@ char *getstr(const char *str)
     index++;
     index_++;
   }
+
+  if(index_ == 0) return NULL;
   resultStr[index_] = '\0';
 	return resultStr;
 }
@@ -97,7 +101,7 @@ id      {letter}({digit}|{letter}|_)*
 <INITIAL>"\n" {adjust(); EM_newline(); continue;}
 <INITIAL>{id} { adjust(); yylval.sval=String(yytext); return ID; }
 <INITIAL>{digit}+ { adjust(); yylval.ival=atoi(yytext); return INT; }
-<INITIAL>\"[^\"]\" { adjust(); yylval.sval=getstr(yytext); return STRING; }
+<INITIAL>\"[^\"]*\" { adjust(); yylval.sval=getstr(yytext); return STRING; }
 <INITIAL>"," { adjust(); return COMMA; }
 <INITIAL>":" { adjust(); return COLON; }
 <INITIAL>";" { adjust(); return SEMICOLON; }
@@ -121,3 +125,9 @@ id      {letter}({digit}|{letter}|_)*
 <INITIAL>"&" { adjust(); return AND; }
 <INITIAL>"|" { adjust(); return OR; }
 <INITIAL>":=" { adjust(); return ASSIGN; }
+
+<INITIAL>"/*" { adjust(); commentCount++; BEGIN COMMENT; }
+
+<COMMENT>"/*" { adjust(); commentCount++; }
+<COMMENT>"*/" { adjust(); commentCount--; if(commentCount == 0){BEGIN INITIAL;} }
+<COMMENT>.|\n { adjust(); }
