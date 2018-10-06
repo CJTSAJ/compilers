@@ -31,8 +31,32 @@ void adjust(void)
  */
 char *getstr(const char *str)
 {
-	//optional: implement this function if you need it
-	return NULL;
+  char *resultStr = (char*)malloc(yyleng);
+
+  int index = 1;
+  int index_ = 0;
+  while(str[index] != '"'){
+    if(str[index] == '\\'){
+      index++;
+      switch(str[index]){
+        case 'n':{
+          resultStr[index_] = '\n';
+          break;
+        }
+        case 't':{
+          resultStr[index_] = '\t';
+          break;
+        }
+        default: break;
+      }
+    }else{
+      resultStr[index_] = str[index];
+    }
+    index++;
+    index_++;
+  }
+  resultStr[index_] = '\0';
+	return resultStr;
 }
 
 %}
@@ -72,6 +96,8 @@ id      {letter}({digit}|{letter}|_)*
 
 <INITIAL>"\n" {adjust(); EM_newline(); continue;}
 <INITIAL>{id} { adjust(); yylval.sval=String(yytext); return ID; }
+<INITIAL>{digit}+ { adjust(); yylval.ival=atoi(yytext); return INT; }
+<INITIAL>\"[^\"]\" { adjust(); yylval.sval=getstr(yytext); return STRING; }
 <INITIAL>"," { adjust(); return COMMA; }
 <INITIAL>":" { adjust(); return COLON; }
 <INITIAL>";" { adjust(); return SEMICOLON; }
