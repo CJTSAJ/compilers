@@ -31,13 +31,17 @@ int commentCount = 0;
  * @output: the string value for the input which has all the escape sequences
  * translated into their meaning.
  */
+#include <ctype.h>
+
 char *getstr(const char *str)
 {
-  char *resultStr = (char*)malloc(yyleng);
-
+  int len = strlen(str);
+  char *resultStr = (char*)malloc(len + 1);
+  //printf("str:: %s\n", str);
   int index = 1;
   int index_ = 0;
   while(str[index] != '"'){
+
     if(str[index] == '\\'){
       index++;
       switch(str[index]){
@@ -49,7 +53,37 @@ char *getstr(const char *str)
           resultStr[index_] = '\t';
           break;
         }
-        default: break;
+        case '"':{
+          resultStr[index_] = '"';
+          break;
+        }
+        case '\\':{
+          resultStr[index_] = '\\';
+          break;
+        }
+        case '^':{ // control character
+          resultStr[index_] = str[index + 1] - 64;
+          index++;
+          break;
+        }
+        default: {
+          if(isdigit(str[index]) && isdigit(str[index + 1]) && isdigit(str[index + 2])){
+            char num[4];
+            num[0] = str[index];
+            num[1] = str[index + 1];
+            num[2] = str[index + 2];
+            num[3] = '\0';
+            index += 2;
+            resultStr[index_] = atoi(num);
+          }else{ //  \     \
+            index++;
+            while(str[index] != '\\'){
+              index++;
+            }
+            index_--;
+          }
+          break;
+        }
       }
     }else{
       resultStr[index_] = str[index];
@@ -101,7 +135,7 @@ id      {letter}({digit}|{letter}|_)*
 <INITIAL>"\n" {adjust(); EM_newline(); continue;}
 <INITIAL>{id} { adjust(); yylval.sval=String(yytext); return ID; }
 <INITIAL>{digit}+ { adjust(); yylval.ival=atoi(yytext); return INT; }
-<INITIAL>\"[^\"]*\" { adjust(); yylval.sval=getstr(yytext); return STRING; }
+<INITIAL>\"(\\\"|[^\"])*\" { adjust(); yylval.sval=getstr(yytext); return STRING; }
 <INITIAL>"," { adjust(); return COMMA; }
 <INITIAL>":" { adjust(); return COLON; }
 <INITIAL>";" { adjust(); return SEMICOLON; }
