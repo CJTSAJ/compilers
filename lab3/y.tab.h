@@ -58,36 +58,36 @@ extern int yydebug;
     LBRACE = 268,
     RBRACE = 269,
     DOT = 270,
-    ASSIGN = 271,
-    ARRAY = 272,
-    IF = 273,
-    THEN = 274,
-    ELSE = 275,
-    WHILE = 276,
-    FOR = 277,
-    TO = 278,
-    DO = 279,
-    LET = 280,
-    IN = 281,
-    END = 282,
-    OF = 283,
-    BREAK = 284,
-    NIL = 285,
-    FUNCTION = 286,
-    VAR = 287,
-    TYPE = 288,
-    AND = 289,
-    OR = 290,
-    EQ = 291,
-    NEQ = 292,
-    LT = 293,
-    LE = 294,
-    GT = 295,
-    GE = 296,
-    PLUS = 297,
-    MINUS = 298,
-    TIMES = 299,
-    DIVIDE = 300,
+    PLUS = 271,
+    MINUS = 272,
+    TIMES = 273,
+    DIVIDE = 274,
+    EQ = 275,
+    NEQ = 276,
+    LT = 277,
+    LE = 278,
+    GT = 279,
+    GE = 280,
+    AND = 281,
+    OR = 282,
+    ASSIGN = 283,
+    ARRAY = 284,
+    IF = 285,
+    THEN = 286,
+    ELSE = 287,
+    WHILE = 288,
+    FOR = 289,
+    TO = 290,
+    DO = 291,
+    LET = 292,
+    IN = 293,
+    END = 294,
+    OF = 295,
+    BREAK = 296,
+    NIL = 297,
+    FUNCTION = 298,
+    VAR = 299,
+    TYPE = 300,
     UMINUS = 301
   };
 #endif
@@ -105,36 +105,36 @@ extern int yydebug;
 #define LBRACE 268
 #define RBRACE 269
 #define DOT 270
-#define ASSIGN 271
-#define ARRAY 272
-#define IF 273
-#define THEN 274
-#define ELSE 275
-#define WHILE 276
-#define FOR 277
-#define TO 278
-#define DO 279
-#define LET 280
-#define IN 281
-#define END 282
-#define OF 283
-#define BREAK 284
-#define NIL 285
-#define FUNCTION 286
-#define VAR 287
-#define TYPE 288
-#define AND 289
-#define OR 290
-#define EQ 291
-#define NEQ 292
-#define LT 293
-#define LE 294
-#define GT 295
-#define GE 296
-#define PLUS 297
-#define MINUS 298
-#define TIMES 299
-#define DIVIDE 300
+#define PLUS 271
+#define MINUS 272
+#define TIMES 273
+#define DIVIDE 274
+#define EQ 275
+#define NEQ 276
+#define LT 277
+#define LE 278
+#define GT 279
+#define GE 280
+#define AND 281
+#define OR 282
+#define ASSIGN 283
+#define ARRAY 284
+#define IF 285
+#define THEN 286
+#define ELSE 287
+#define WHILE 288
+#define FOR 289
+#define TO 290
+#define DO 291
+#define LET 292
+#define IN 293
+#define END 294
+#define OF 295
+#define BREAK 296
+#define NIL 297
+#define FUNCTION 298
+#define VAR 299
+#define TYPE 300
 #define UMINUS 301
 
 /* Value type.  */
@@ -142,28 +142,27 @@ extern int yydebug;
 
 union YYSTYPE
 {
-#line 19 "tiger.y" /* yacc.c:1909  */
+#line 26 "tiger.y" /* yacc.c:1909  */
 
 	int pos;
 	int ival;
 	string sval;
-	A_exp exp;
-	A_expList explist;
 	A_var var;
-	A_decList declist;
-	A_dec  dec;
-	A_efieldList efieldlist;
-	A_efield  efield;
-	A_namety namety;
-	A_nametyList nametylist;
-	A_fieldList fieldlist;
-	A_field field;
-	A_fundecList fundeclist;
+	A_exp exp;
+	A_expList expList;
+	A_dec dec;
+	A_decList decList;
 	A_fundec fundec;
+	A_fundecList fundecList;
+	A_namety namety;
+	A_nametyList nametyList;
+	A_field field;
+	A_fieldList fieldList;
+	A_efield efield;
+	A_efieldList efieldList;
 	A_ty ty;
-	
 
-#line 167 "y.tab.h" /* yacc.c:1909  */
+#line 166 "y.tab.h" /* yacc.c:1909  */
 };
 
 typedef union YYSTYPE YYSTYPE;
