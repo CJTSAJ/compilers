@@ -90,11 +90,25 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 		return expTy(NULL, Ty_Int());
 	}
 
-	if(actual_ty(x->u.var.ty.kind) != Ty_record)
+	Ty_ty originTy = x->u.var.ty;
+	if(actual_ty(originTy.kind) != Ty_record)
 		EM_error(a->pos, "not a record");
 
-	while(recordFields){
+	Ty_fieldList originFields = originTy.record;
 
+	Ty_field tmpTyField = NULL;
+	A_efield tmpEfield = NULL;
+	while(recordFields){
+		tmpEfield = recordFields->head;
+		tmpTyField = originFields->head;
+
+		//name must be same
+		if(tmpEfield->name != tmpTyField->name){
+			EM_error(a->pos, "field %s doesn't exist", S_name(tmpEfield->name));
+			return expTy(NULL, Ty_Record(NULL));
+		}
+
+		
 	}
 }
 
