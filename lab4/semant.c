@@ -42,6 +42,33 @@ Ty_ty actual_ty(Ty_ty ty)
 	return result;
 }
 
+Ty_ty transTy(S_table tenv, A_ty a)
+{
+	switch (a->kind) {
+		case A_nameTy:{
+			S_look(tenv, a->u.name);
+		}
+		case A_recordTy:
+			return transRecordTy(tenv, a);
+		case A_arrayTy:
+			return transArrayTy(tenv, a);
+		default:{
+			EM_error(a->pos, "undefined type");
+			return Ty_Int();
+		}
+	}
+}
+
+Ty_ty transArrayTy(S_table tenv, A_ty a)
+{
+
+}
+
+Ty_ty transRecordTy(S_table tenv, A_ty a)
+{
+
+}
+
 expty transExp(S_table venv, S_table tenv, A_exp a)
 {
 	switch (a->kind) {
@@ -353,12 +380,29 @@ void transDec(S_table venv, S_table tenv, A_dec d)
 			transVarDec(venv, tenv, d);
 			break;
 		case A_typeDec:
-			transTypeDec(S_table venv, S_table tenv, A_dec d);
+			transTypeDec(venv, tenv, d);
 			break;
 		default:
 			break;
 	}
 	return;
+}
+
+void transTypeDec(S_table venv, S_table tenv, A_dec d)
+{
+	A_nametyList nameTyList = d->u.type;
+
+	A_nametyList i;
+	for(i = nameTyList; i; i = i->tail){
+
+		//existed
+		if(S_look(tenv, i->head->name)){
+			EM_error(d->pos, "two types have the same name");
+			return;
+		}
+
+		S_enter(tenv, i->head->name, Ty_Name(i->head->name, ))
+	}
 }
 
 
