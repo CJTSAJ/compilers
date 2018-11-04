@@ -17,6 +17,12 @@ expty transOp(S_table venv, S_table tenv, A_exp a);
 expty transCall(S_table venv, S_table tenv, A_exp a);
 expty transSeq(S_table venv, S_table tenv, A_exp a);
 expty transAssign(S_table venv, S_table tenv, A_exp a);
+expty transIf(S_table venv, S_table tenv, A_exp a);
+expty transWhile(S_table venv, S_table tenv, A_exp a);
+expty transWhile(S_table venv, S_table tenv, A_exp a);
+expty transFor(S_table venv, S_table tenv, A_exp a);
+expty transLet(S_table venv, S_table tenv, A_exp a);
+expty transArray(S_table venv, S_table tenv, A_exp a);
 //In Lab4, the first argument exp should always be **NULL**.
 expty expTy(Tr_exp exp, Ty_ty ty)
 {
@@ -58,25 +64,105 @@ expty transExp(S_table venv, S_table tenv, A_exp a)
 		case A_assignExp:
 			return transAssign(venv, tenv, a);
 		case A_ifExp:
-			return transIf();
+			return transIf(venv, tenv, a);
 		case A_whileExp:
-			return transWhile();
+			return transWhile(venv, tenv, a);
 		case A_forExp:
-			return transFor();
+			return transFor(venv, tenv, a);
 		case A_breakExp:
-			return transBreak();
+			return expTy(NULL, Ty_Void());
 		case A_letExp:
-			return transLet();
+			return transLet(venv, tenv, a);
 		case A_arrayExp:
-			return transArray();
+			return transArray(venv, tenv, a);
 		default:
 			return NULL;
 	}
 }
 
+//type-id[exp1] of exp2
+expty transArray(S_table venv, S_table tenv, A_exp a)
+{
+	Ty_ty arrayTy = S_look(tenv, a->u.array.typ);
+
+	expty sizeTy = transExp(venv, tenv, a->u.array.size);
+	expty initTy = transExp(venv, tenv, a->u.array.init);
+	if(actual_ty(arrayTy)->kind != Ty_array)
+		EM_error(a->pos, "not a array type");
+
+	if(actual_ty(sizeTy)->kind != Ty_int)
+		EM_error(a->u.array.size.pos, "type not int");
+
+	if(actual_ty(initTy)->kind != Ty_int)
+		EM_error(a->u.array.init.pos, "type not int");
+	return expTy(NULL, Ty_Array(arrayTy));
+}
+
+expty transLet(S_table venv, S_table tenv, A_exp a)
+{
+	A_decList letDecs = a->u.let.decs;
+
+	while(letDecs){
+		transDec(venv, tenv, letDecs->head);
+		letDecs = letDecs->tail;
+	}
+
+	return transExp(venv, tenv, a->u.let.body);
+}
+
+expty transFor(S_table venv, S_table tenv, A_exp a)
+{
+	S_beginScope(venv);
+
+	expty forLoTy = transExp(venv, tenv, a->u.forr.lo);
+	expty forHiTy = transExp(venv, tenv, a->u.forr.hi);
+
+	if(actual_ty(forLoTy.ty)->kind != Ty_int || actual_ty(forHiTy.ty)->kind != Ty_int)
+		EM_error(a->pos, "not int");
+
+	S_enter(venv, a->u.forr.var, forLoTy.ty);
+
+	S_endScope(venv);
+
+	return expTy(NULL, Ty_Void());
+}
+
+//while body no value
+expty transWhile(S_table venv, S_table tenv, A_exp a)
+{
+	A_exp whileTest = a->u.whilee.test;
+	A_exp whileBody = a->u.whilee.body;
+
+	expty whileBodyTy = transExp(venv, tenv, whileBody);
+	if(expty.ty->kind != Ty_void)
+		EM_error(a->pos, "while body must produce no value");
+
+	return expTy(NULL, Ty_Void());
+}
+
+expty transIf(S_table venv, S_table tenv, A_exp a)
+{
+	A_exp ifTest = a->u.iff.test;
+	A_exp ifThen = a->u.iff.then;
+	A_exp ifElse = a->u.iff.elsee;
+
+	expty ifElseTy = transExp(venv, tenv, ifElse);
+
+	return expTy(NULL, ifElseTy.ty);
+}
+
 expty transAssign(S_table venv, S_table tenv, A_exp a)
 {
+	A_var assignVar = a->u.assign.var;
+	A_exp assignExp = a->u.assign.exp;
 
+	expty assignExpTy = transExp(venv, tenv, assignExp);
+	expty assignVarTy = transVar(venv, tenv, assignVar);
+
+	if(actual_ty(assignExpTy.ty) != actual_ty(assignVarTy.ty))
+		EM_error(a->pos, "assign type not same");
+
+	return expTy(NULL, assignVarTy.ty);
 }
 
 //return type of the last exp
@@ -259,7 +345,49 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 
 void transDec(S_table venv, S_table tenv, A_dec d)
 {
+	switch (d->kind) {
+		case A_functionDec:
+			transFunDec(venv, tenv, d);
+			break;
+		case A_varDec:
+			transVarDec(S_table venv, S_table tenv, A_dec d);
+			break;
+		case A_typeDec:
+			transTypeDec(S_table venv, S_table tenv, A_dec d);
+			break;
+		default:
+			break;
+	}
+	return;
+}
 
+transFunDec(S_table venv, S_table tenv, A_dec d)
+{
+	A_fundecList funcList = d->u.function;
+
+	A_fundec tmpFun = NULL;
+	while(funcList){
+		tmpFun = funcList->head;
+
+		Ty_tyList funFormals = Ty_TyList(NULL, NULL);
+		Ty_tyList funFormalsTail = funFormals;
+
+		A_fieldList funParas = tmpFun->params;
+		A_field tmpField = NULL;
+		while(funParas){
+			tmpField = funParas->head;
+
+			Ty_ty tmpTy = S_look(tenv, tmpField->typ);
+			Ty_tyList tmpTyList = Ty_TyList(tmpTy, NULL);
+			tmpTyList->tail = NULL;
+
+			funFormalsTail->tail = tmpTyList;
+			funFormalsTail = tmpTyList;
+		}
+
+		Ty_ty funResult = S_look(tenv, tmpFun->result);
+		S_enter(venv, tmpFun->name, E_FunEntry(funFormals, funResult));
+	}
 }
 Ty_ty	transTy (S_table tenv, A_ty a)
 {
