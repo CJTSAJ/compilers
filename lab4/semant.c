@@ -350,7 +350,7 @@ void transDec(S_table venv, S_table tenv, A_dec d)
 			transFunDec(venv, tenv, d);
 			break;
 		case A_varDec:
-			transVarDec(S_table venv, S_table tenv, A_dec d);
+			transVarDec(venv, tenv, d);
 			break;
 		case A_typeDec:
 			transTypeDec(S_table venv, S_table tenv, A_dec d);
@@ -361,9 +361,24 @@ void transDec(S_table venv, S_table tenv, A_dec d)
 	return;
 }
 
+
+void transVarDec(S_table venv, S_table tenv, A_dec d)
+{
+	Ty_ty varTy = S_look(tenv, d->u.var.typ);
+	expty initTy = transExp(venv, tenv, d->u.var.init);
+
+	//check var type and init type
+	if(actual_ty(varTy) != actual_ty(initTy.ty)){
+		EM_error(d->pos, "type mismatch");
+		return;
+	}
+
+	S_enter(venv, d->var.var, E_VarEntry(varTy));
+}
+
 //check params and func body
 //type of func body must be same as result
-transFunDec(S_table venv, S_table tenv, A_dec d)
+void transFunDec(S_table venv, S_table tenv, A_dec d)
 {
 	A_fundecList funcList = d->u.function;
 
@@ -436,6 +451,7 @@ transFunDec(S_table venv, S_table tenv, A_dec d)
 		funcList = funcList->tail;
 	}
 }
+
 Ty_ty	transTy (S_table tenv, A_ty a)
 {
 
