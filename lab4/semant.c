@@ -12,14 +12,11 @@
 
 /*Lab4: Your implementation of lab4*/
 
-
-typedef void* Tr_exp;
-struct expty_
-{
-	Tr_exp exp;
-	Ty_ty ty;
-} expty;
-
+expty transRecord(S_table venv, S_table tenv, A_exp a);
+expty transOp(S_table venv, S_table tenv, A_exp a);
+expty transCall(S_table venv, S_table tenv, A_exp a);
+expty transSeq(S_table venv, S_table tenv, A_exp a);
+expty transAssign(S_table venv, S_table tenv, A_exp a);
 //In Lab4, the first argument exp should always be **NULL**.
 expty expTy(Tr_exp exp, Ty_ty ty)
 {
@@ -45,11 +42,11 @@ expty transExp(S_table venv, S_table tenv, A_exp a)
 		case A_varExp:
 			return transVar(venv, tenv, a->u.var);
 		case A_nilExp:
-			return expTy(NULL, Ty_nil());
+			return expTy(NULL, Ty_Nil());
 		case A_intExp:
-			return expTy(NULL, Ty_int());
+			return expTy(NULL, Ty_Int());
 		case A_stringExp:
-			return expTy(NULL, Ty_string());
+			return expTy(NULL, Ty_String());
 		case A_callExp:
 			return transCall(venv, tenv, a);
 		case A_opExp:
@@ -57,9 +54,9 @@ expty transExp(S_table venv, S_table tenv, A_exp a)
 		case A_recordExp:
 		 	return transRecord(venv, tenv, a);
 		case A_seqExp:
-			return transSeq();
+			return transSeq(venv, tenv, a);
 		case A_assignExp:
-			return transAssign();
+			return transAssign(venv, tenv, a);
 		case A_ifExp:
 			return transIf();
 		case A_whileExp:
@@ -77,6 +74,24 @@ expty transExp(S_table venv, S_table tenv, A_exp a)
 	}
 }
 
+expty transAssign(S_table venv, S_table tenv, A_exp a)
+{
+
+}
+
+//return type of the last exp
+expty transSeq(S_table venv, S_table tenv, A_exp a)
+{
+	A_expList seqExp = a->u.seq;
+
+	expty result = NULL;
+	while(seqExp){
+		result = transExp(venv, tenv, seqExp->head);
+		seqExp = seqExp->tail;
+	}
+
+	return result;
+}
 //check whether the type of each field of record is same as tyfields
 expty transRecord(S_table venv, S_table tenv, A_exp a)
 {

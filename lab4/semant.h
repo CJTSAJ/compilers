@@ -4,10 +4,15 @@
 #include "absyn.h"
 #include "symbol.h"
 
-struct expty;
+typedef void* Tr_exp;
+typedef struct expty_
+{
+	Tr_exp exp;
+	Ty_ty ty;
+} expty;
 
-struct expty transVar(S_table venv, S_table tenv, A_var v);
-struct expty transExp(S_table venv, S_table tenv, A_exp a);
+expty transVar(S_table venv, S_table tenv, A_var v);
+expty transExp(S_table venv, S_table tenv, A_exp a);
 void		 transDec(S_table venv, S_table tenv, A_dec d);
 Ty_ty		 transTy (              S_table tenv, A_ty a);
 
