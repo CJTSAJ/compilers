@@ -361,6 +361,8 @@ void transDec(S_table venv, S_table tenv, A_dec d)
 	return;
 }
 
+//check params and func body
+//type of func body must be same as result
 transFunDec(S_table venv, S_table tenv, A_dec d)
 {
 	A_fundecList funcList = d->u.function;
@@ -374,19 +376,64 @@ transFunDec(S_table venv, S_table tenv, A_dec d)
 
 		A_fieldList funParas = tmpFun->params;
 		A_field tmpField = NULL;
-		while(funParas){
+		while(funParas){ //build formals of fun and check params
 			tmpField = funParas->head;
 
 			Ty_ty tmpTy = S_look(tenv, tmpField->typ);
+
+			//check para type
+			if(!tmpTy)
+				EM_error(tmpField->pos, "undefined para type %s", S_name(tmpField->typ));
+
 			Ty_tyList tmpTyList = Ty_TyList(tmpTy, NULL);
 			tmpTyList->tail = NULL;
 
 			funFormalsTail->tail = tmpTyList;
 			funFormalsTail = tmpTyList;
+
+			//next param
+			funParas = funParas->tail;
 		}
 
-		Ty_ty funResult = S_look(tenv, tmpFun->result);
+		Ty_ty funResult = S_look(tenv, tmpFun->result); //fun result type
+
+		//check result type
+		if(!funResult)
+			EM_error(tmpField->pos, "undefined result type %s", S_name(tmpFun->result));
+
 		S_enter(venv, tmpFun->name, E_FunEntry(funFormals, funResult));
+
+		//next function
+		funcList = funcList->tail;
+	}
+
+	//check func body
+	funcList = d->u.function;
+	while(funcList){
+		tmpFun = funcList->head;
+
+		E_enventry x = S_look(venv, tmpFun->name);
+		Ty_tyList tmpFormals = x->u.fun.formals;
+
+		S_beginScope(tenv); S_beginScope(venv);
+
+		Ty_tyList i;
+		A_fieldList j;
+
+		//add the params to env
+		for(i = tmpFormals, j = tmpFun->params; i; i = i->tail, j = j->tail;)
+			S_enter(venv, j->head->name, E_VarEntry(i->head));
+
+		//check body
+		expty tmpBodyTy = transExp(tenv, venv, tmpFun->body);
+
+		if(actual_ty(tmpBodyTy.ty) != actual_ty(x->u.fun.result))
+			EM_error(tmpFun->body->pos, "mismatch type of result");
+
+		S_endScope(tenv);S_endScope(venv);
+
+		//next function
+		funcList = funcList->tail;
 	}
 }
 Ty_ty	transTy (S_table tenv, A_ty a)
