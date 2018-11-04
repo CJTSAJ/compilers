@@ -55,7 +55,7 @@ expty transExp(S_table venv, S_table tenv, A_exp a)
 		case A_opExp:
 			return transOp(venv, tenv, a);
 		case A_recordExp:
-		 	return transRecord();
+		 	return transRecord(venv, tenv, a);
 		case A_seqExp:
 			return transSeq();
 		case A_assignExp:
@@ -91,25 +91,34 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 	}
 
 	Ty_ty originTy = x->u.var.ty;
-	if(actual_ty(originTy.kind) != Ty_record)
+	if(actual_ty(originTy)->kind != Ty_record)
 		EM_error(a->pos, "not a record");
 
 	Ty_fieldList originFields = originTy.record;
 
 	Ty_field tmpTyField = NULL;
 	A_efield tmpEfield = NULL;
-	while(recordFields){
+	while(recordFields && originFields){
 		tmpEfield = recordFields->head;
 		tmpTyField = originFields->head;
 
 		//name must be same
-		if(tmpEfield->name != tmpTyField->name){
+		if(tmpEfield->name != tmpTyField->name)
 			EM_error(a->pos, "field %s doesn't exist", S_name(tmpEfield->name));
-			return expTy(NULL, Ty_Record(NULL));
-		}
 
-		
+		Ty_ty tmpExpTy = transExp(venv, tenv, tmpEfield->exp);
+
+		if(actual_ty(tmpExpTy.ty) != actual_ty(tmpTyField->ty))
+			EM_error(a->pos, "record type not match");
+
+		recordFields = recordFields->tail;
+		originFields = originFields->tail;
 	}
+
+	if(originFields || recordFields)
+		EM_error(a->pos, "the number of field not match");
+
+	return expTy(NULL, originTy);
 }
 
 //the type of L$R must be int when the op is +-*/
@@ -123,12 +132,12 @@ expty transOp(S_table venv, S_table tenv, A_exp a)
 	expty leftExpTy = transExp(venv, tenv, leftExp);
 	expty rightExpTy = transExp(venv, tenv, rightExp);
 	if(oper == A_plusOp || oper == A_minusOp || oper == A_timesOp || oper == A_divideOp){
-		if(leftExpTy.ty != Ty_int)
+		if(actual_ty(leftExpTy.ty)->kind != Ty_int)
 			EM_error(leftExp->pos, "integer required");
-		if(rightExpTy.ty != Ty_int)
+		if(actual_ty(rightExpTy.ty)->kind != Ty_int)
 			EM_error(rightExp->pos, "integer required");
 	}else{
-		if(leftExpTy.ty != rightExpTy.ty)
+		if(actual_ty(leftExpTy.ty) != actual_ty(rightExpTy.ty))
 			EM_error(a->pos, "not same type");
 	}
 
@@ -149,9 +158,8 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 	expty tmpExpTy = NULL;
 	while(funcArgs && funcFormals){
 		tmpExpTy = transExp(venv, tenv, funcArgs->head);
-		if(tmpExpTy.ty != funcFormals->head){
+		if(actual_ty(tmpExpTy.ty) != actual_ty(funcFormals->head))
 			EM_error(funcArgs->head->pos, "args type not same");
-		}
 
 		funcArgs = funcArgs->tail;
 		funcFormals = funcFormals->tail;
@@ -160,7 +168,7 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 	if(funcArgs || funcFormals)
 		EM_error(a->pos, "the number of args is not same");
 
-	return expTy(NULL, actual_ty(x->u.fun.result));
+	return expTy(NULL, x->u.fun.result);
 }
 
 expty transVar(S_table venv, S_table tenv, A_var v)
@@ -184,7 +192,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 			expty fieldCaseTy = transVar(fieldCase);
 			Ty_ty fieldActualTy = actual_ty(fieldCaseTy.ty);
 
-			if(fieldActualTy.kind != Ty_record){
+			if(fieldActualTy->kind != Ty_record){
 				EM_error(v->pos, "not a record type");
 				return expTy(NULL, Ty_Int());
 			}
@@ -206,7 +214,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 				return expTy(NULL, Ty_Int());
 			}
 
-			return expTy(NULL, actual_ty(tmpField->ty));
+			return expTy(NULL, tmpField->ty);
 		}
 		case A_subscriptVar:{
 			//find the actual type of the array
@@ -217,17 +225,17 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 			expty arrExpTy = transExp(venv, tenv, arrExp);
 			expty arrVarTy = transVar(venv, tenv, arrVar);
 
-			if(arrExpTy.ty != Ty_int){
+			if(actual_ty(arrExpTy.ty)->kind != Ty_int){
 				EM_error(v->pos, "wrong index");
 				return expTy(NULL, Ty_Int());
 			}
 
-			if(arrVarTy.ty != Ty_array){
+			if(actual_ty(arrVarTy.ty)->kind != Ty_array){
 				EM_error(v->pos, "not Ty_array");
 				return expTy(NULL, Ty_Int());
 			}
 
-			return expTy(NULL, actual_ty(arrVarTy.ty->u.array));
+			return expTy(NULL, arrVarTy.ty->u.array);
 		}
 		default:
 			return NULL;
