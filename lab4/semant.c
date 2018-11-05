@@ -46,12 +46,21 @@ Ty_ty transTy(S_table tenv, A_ty a)
 {
 	switch (a->kind) {
 		case A_nameTy:{
-			S_look(tenv, a->u.name);
+			E_enventry x = S_look(tenv, a->u.name);
+			if(!x)
+				EM_error(a->pos, "not found type");
+
+			return x->u.var.ty;
 		}
 		case A_recordTy:
 			return transRecordTy(tenv, a);
-		case A_arrayTy:
-			return transArrayTy(tenv, a);
+		case A_arrayTy:{
+			Ty_ty arrayTy = S_look(tenv, a->u.array);
+			if(!arrayTy)
+				EM_error(a->pos, "not found type");
+
+			return Ty_Array(arrayTy);
+		}
 		default:{
 			EM_error(a->pos, "undefined type");
 			return Ty_Int();
@@ -59,14 +68,29 @@ Ty_ty transTy(S_table tenv, A_ty a)
 	}
 }
 
-Ty_ty transArrayTy(S_table tenv, A_ty a)
-{
-
-}
-
 Ty_ty transRecordTy(S_table tenv, A_ty a)
 {
+	A_fieldList recordFields = a->u.record;
+	Ty_fieldList tyList = Ty_FieldList(NULL, NULL);//trans A to TY
+	Ty_fieldList tmpTyFieldList = tyList;
 
+	A_fieldList i;
+	for(i = recordFields; i; i = i->tail;){
+		Ty_fieldList tmpTail = Ty_fieldList(NULL, NULL);//alloc tail space
+
+		Ty_ty tmpTy = S_look(tenv, i->head->typ);
+
+		if(!tmpTy)
+			EM_error(i->head->pos, "not found type");
+
+		tmpTyFieldList->head = Ty_Field(i->head->name, tmpTy);
+		tmpTyFieldList->tail = tmpTail;
+
+		//next ty fieldlist
+		tmpTyFieldList = tmpTail;
+	}
+
+	return Ty_Record(tyList);
 }
 
 expty transExp(S_table venv, S_table tenv, A_exp a)
@@ -401,7 +425,7 @@ void transTypeDec(S_table venv, S_table tenv, A_dec d)
 			return;
 		}
 
-		S_enter(tenv, i->head->name, Ty_Name(i->head->name, ))
+		S_enter(tenv, i->head->name, Ty_Name(i->head->name, transTy(tenv, i->head->ty)));
 	}
 }
 
