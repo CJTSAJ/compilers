@@ -228,8 +228,18 @@ expty transIf(S_table venv, S_table tenv, A_exp a)
 	expty ifTestTy = transExp(venv, tenv, ifTest);
 	expty ifElseTy = transExp(venv, tenv, ifElse);
 	expty ifThenTy = transExp(venv, tenv, ifThen);
-	if(actual_ty(ifElseTy.ty) != actual_ty(ifThenTy.ty))
+
+	if(actual_ty(ifElseTy.ty)->kind == Ty_nil){
 		EM_error(a->pos, "if-then exp's body must produce no value");
+		return expTy(NULL, Ty_Int());
+	}
+	else{
+		if(actual_ty(ifElseTy.ty) != actual_ty(ifThenTy.ty)){
+			EM_error(a->pos, "then exp and else exp type mismatch");
+			return expTy(NULL, Ty_Int());
+		}
+	}
+
 
 	return expTy(NULL, ifElseTy.ty);
 }
@@ -324,15 +334,24 @@ expty transOp(S_table venv, S_table tenv, A_exp a)
 	expty leftExpTy = transExp(venv, tenv, leftExp);
 	expty rightExpTy = transExp(venv, tenv, rightExp);
 	if(oper == A_plusOp || oper == A_minusOp || oper == A_timesOp || oper == A_divideOp){
-		if(actual_ty(leftExpTy.ty)->kind != Ty_int)
+		if(actual_ty(leftExpTy.ty)->kind != Ty_int){
 			EM_error(leftExp->pos, "integer required");
-		if(actual_ty(rightExpTy.ty)->kind != Ty_int)
+			return expTy(NULL, Ty_Int());
+		}
+
+		if(actual_ty(rightExpTy.ty)->kind != Ty_int){
 			EM_error(rightExp->pos, "integer required");
+			return expTy(NULL, Ty_Int());
+		}
+
 	}else{
 		//Ty_print(actual_ty(leftExpTy.ty));
 		//Ty_print(actual_ty(rightExpTy.ty));
-		if(actual_ty(leftExpTy.ty) != actual_ty(rightExpTy.ty))
+		if(actual_ty(leftExpTy.ty) != actual_ty(rightExpTy.ty)){
 			EM_error(a->pos, "same type required");
+			return expTy(NULL, Ty_Int());
+		}
+
 	}
 
 	return expTy(NULL, Ty_Int());
@@ -380,6 +399,7 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 
 expty transVar(S_table venv, S_table tenv, A_var v)
 {
+	printf("transVar\n");
 	switch (v->kind) {
 		case A_simpleVar:{
 			//find the actual ty of simple var
@@ -535,7 +555,17 @@ void transVarDec(S_table venv, S_table tenv, A_dec d)
 
 		S_enter(venv, d->u.var.var, E_VarEntry(varTy));
 	}else{
-		S_enter(venv, d->u.var.var, E_VarEntry(initTy.ty));
+		if(initTy.ty){
+			if(actual_ty(initTy.ty)->kind != Ty_nil)
+				S_enter(venv, d->u.var.var, E_VarEntry(initTy.ty));
+			else{
+				EM_error(d->pos, "init should not be nil without type specified");
+				return;
+			}
+		}else{
+			S_enter(venv, d->u.var.var, E_VarEntry(Ty_Void()));
+		}
+
 	}
 }
 
@@ -550,6 +580,10 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 	while(funcList){
 		tmpFun = funcList->head;
 
+		if(S_look(venv, tmpFun->name)){
+			EM_error(d->pos, "two functions have the same name");
+			return;
+		}
 		Ty_tyList funFormals = makeFormals(tenv, tmpFun->params);
 
 		Ty_ty funResult;
@@ -557,8 +591,11 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 			funResult = S_look(tenv, tmpFun->result); //fun result type
 
 			//check result type
-			if(!funResult)
+			if(!funResult){
 				EM_error(tmpFun->pos, "undefined result type %s", S_name(tmpFun->result));
+				return;
+			}
+
 		}else{
 			funResult = Ty_Void();
 		}
