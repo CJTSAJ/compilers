@@ -49,13 +49,14 @@ Ty_ty actual_ty(Ty_ty ty)
 
 Ty_ty transTy(S_table tenv, A_ty a)
 {
+	printf("transTy\n");
 	switch (a->kind) {
 		case A_nameTy:{
-			E_enventry x = S_look(tenv, a->u.name);
-			if(!x)
+			Ty_ty tmpTy = S_look(tenv, a->u.name);
+			if(!tmpTy)
 				EM_error(a->pos, "illegal type cycle");
-
-			return x->u.var.ty;
+			printf("nameTY\n");
+			return tmpTy;
 		}
 		case A_recordTy:
 			return transRecordTy(tenv, a);
@@ -461,7 +462,31 @@ void transTypeDec(S_table venv, S_table tenv, A_dec d)
 			return;
 		}
 
-		S_enter(tenv, i->head->name, Ty_Name(i->head->name, transTy(tenv, i->head->ty)));
+		S_enter(tenv, i->head->name, Ty_Name(i->head->name, NULL));
+	}
+
+	//second loop  fresh the type
+	for(i = nameTyList; i; i = i->tail){
+		Ty_ty tmpTy = S_look(tenv, i->head->name);
+		//printf("name: %s\n", S_name(i->head->name));
+		tmpTy->u.name.ty = transTy(tenv, i->head->ty);
+	}
+
+	//detect the illegle cycle
+	for(i = nameTyList; i; i = i->tail){
+		printf("loop\n");
+		Ty_ty beginTy = S_look(tenv, i->head->name);
+		Ty_ty tmpTy = beginTy;
+		//printf("name :%s\n", S_name(tmpTy->u.name.sym));
+		while(tmpTy->kind == Ty_name){
+			printf("name :%s\n", S_name(tmpTy->u.name.sym));
+			tmpTy = tmpTy->u.name.ty;
+			Ty_print(tmpTy);
+			if(tmpTy == beginTy){
+				EM_error(d->pos, "illegal type cycle");
+				break;
+			}
+		}
 	}
 }
 
@@ -567,6 +592,7 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 void SEM_transProg(A_exp exp)
 {
 	printf("SEM_transProg\n");
+
 	S_table venv = E_base_venv();
 	S_table tenv = E_base_tenv();
 
