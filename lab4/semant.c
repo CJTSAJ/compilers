@@ -23,6 +23,7 @@ expty transWhile(S_table venv, S_table tenv, A_exp a);
 expty transFor(S_table venv, S_table tenv, A_exp a);
 expty transLet(S_table venv, S_table tenv, A_exp a);
 expty transArray(S_table venv, S_table tenv, A_exp a);
+Ty_ty transRecordTy(S_table tenv, A_ty a);
 //In Lab4, the first argument exp should always be **NULL**.
 expty expTy(Tr_exp exp, Ty_ty ty)
 {
@@ -75,8 +76,8 @@ Ty_ty transRecordTy(S_table tenv, A_ty a)
 	Ty_fieldList tmpTyFieldList = tyList;
 
 	A_fieldList i;
-	for(i = recordFields; i; i = i->tail;){
-		Ty_fieldList tmpTail = Ty_fieldList(NULL, NULL);//alloc tail space
+	for(i = recordFields; i; i = i->tail){
+		Ty_fieldList tmpTail = Ty_FieldList(NULL, NULL);//alloc tail space
 
 		Ty_ty tmpTy = S_look(tenv, i->head->typ);
 
@@ -126,8 +127,10 @@ expty transExp(S_table venv, S_table tenv, A_exp a)
 			return transLet(venv, tenv, a);
 		case A_arrayExp:
 			return transArray(venv, tenv, a);
-		default:
-			return NULL;
+		default:{
+			EM_error(a->pos, "strange exp type %d", a->kind);
+			return expTy(NULL, Ty_Int());
+		}
 	}
 }
 
@@ -141,11 +144,11 @@ expty transArray(S_table venv, S_table tenv, A_exp a)
 	if(actual_ty(arrayTy)->kind != Ty_array)
 		EM_error(a->pos, "not a array type");
 
-	if(actual_ty(sizeTy)->kind != Ty_int)
-		EM_error(a->u.array.size.pos, "type not int");
+	if(actual_ty(sizeTy.ty)->kind != Ty_int)
+		EM_error(a->u.array.size->pos, "type not int");
 
-	if(actual_ty(initTy)->kind != Ty_int)
-		EM_error(a->u.array.init.pos, "type not int");
+	if(actual_ty(initTy.ty)->kind != Ty_int)
+		EM_error(a->u.array.init->pos, "type not int");
 	return expTy(NULL, Ty_Array(arrayTy));
 }
 
@@ -185,7 +188,7 @@ expty transWhile(S_table venv, S_table tenv, A_exp a)
 	A_exp whileBody = a->u.whilee.body;
 
 	expty whileBodyTy = transExp(venv, tenv, whileBody);
-	if(expty.ty->kind != Ty_void)
+	if(whileBodyTy.ty->kind != Ty_void)
 		EM_error(a->pos, "while body must produce no value");
 
 	return expTy(NULL, Ty_Void());
@@ -221,7 +224,7 @@ expty transSeq(S_table venv, S_table tenv, A_exp a)
 {
 	A_expList seqExp = a->u.seq;
 
-	expty result = NULL;
+	expty result;
 	while(seqExp){
 		result = transExp(venv, tenv, seqExp->head);
 		seqExp = seqExp->tail;
@@ -246,7 +249,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 	if(actual_ty(originTy)->kind != Ty_record)
 		EM_error(a->pos, "not a record");
 
-	Ty_fieldList originFields = originTy.record;
+	Ty_fieldList originFields = originTy->u.record;
 
 	Ty_field tmpTyField = NULL;
 	A_efield tmpEfield = NULL;
@@ -258,7 +261,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 		if(tmpEfield->name != tmpTyField->name)
 			EM_error(a->pos, "field %s doesn't exist", S_name(tmpEfield->name));
 
-		Ty_ty tmpExpTy = transExp(venv, tenv, tmpEfield->exp);
+		expty tmpExpTy = transExp(venv, tenv, tmpEfield->exp);
 
 		if(actual_ty(tmpExpTy.ty) != actual_ty(tmpTyField->ty))
 			EM_error(a->pos, "record type not match");
@@ -302,12 +305,12 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 	S_symbol funcSym = a->u.call.func;
 	A_expList funcArgs = a->u.call.args;
 
-	E_enventry x = S_look(venv, v->funcSym);
+	E_enventry x = S_look(venv, funcSym);
 	//if(!x || x->kind != E_funEntry);
 
 	Ty_tyList funcFormals = x->u.fun.formals;
 
-	expty tmpExpTy = NULL;
+	expty tmpExpTy;
 	while(funcArgs && funcFormals){
 		tmpExpTy = transExp(venv, tenv, funcArgs->head);
 		if(actual_ty(tmpExpTy.ty) != actual_ty(funcFormals->head))
@@ -341,7 +344,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 			A_var fieldCase = v->u.field.var; //field.id
 			S_symbol idSym = v->u.field.sym;
 
-			expty fieldCaseTy = transVar(fieldCase);
+			expty fieldCaseTy = transVar(venv, tenv, fieldCase);
 			Ty_ty fieldActualTy = actual_ty(fieldCaseTy.ty);
 
 			if(fieldActualTy->kind != Ty_record){
@@ -389,8 +392,10 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 
 			return expTy(NULL, arrVarTy.ty->u.array);
 		}
-		default:
-			return NULL;
+		default:{
+			EM_error(v->pos, "strange variable type %d", v->kind);
+			return expTy(NULL, Ty_Int());
+		}
 	}
 }
 
@@ -441,7 +446,7 @@ void transVarDec(S_table venv, S_table tenv, A_dec d)
 		return;
 	}
 
-	S_enter(venv, d->var.var, E_VarEntry(varTy));
+	S_enter(venv, d->u.var.var, E_VarEntry(varTy));
 }
 
 //check params and func body
@@ -504,7 +509,7 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 		A_fieldList j;
 
 		//add the params to env
-		for(i = tmpFormals, j = tmpFun->params; i; i = i->tail, j = j->tail;)
+		for(i = tmpFormals, j = tmpFun->params; i; i = i->tail, j = j->tail)
 			S_enter(venv, j->head->name, E_VarEntry(i->head));
 
 		//check body
@@ -518,9 +523,4 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 		//next function
 		funcList = funcList->tail;
 	}
-}
-
-Ty_ty	transTy (S_table tenv, A_ty a)
-{
-
 }
