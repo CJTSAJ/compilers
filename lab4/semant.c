@@ -159,11 +159,15 @@ expty transArray(S_table venv, S_table tenv, A_exp a)
 	if(actual_ty(arrayTy)->kind != Ty_array)
 		EM_error(a->pos, "not a array type");
 
-	if(actual_ty(sizeTy.ty)->kind != Ty_int)
-		EM_error(a->u.array.size->pos, "type not int");
+	if(actual_ty(sizeTy.ty)->kind != Ty_int){
+		EM_error(a->u.array.size->pos, "type mismatch");
+		return expTy(NULL, Ty_Int());
+	}
 
-	if(actual_ty(initTy.ty)->kind != Ty_int)
-		EM_error(a->u.array.init->pos, "type not int");
+	if(actual_ty(initTy.ty)->kind != Ty_int){
+		EM_error(a->u.array.init->pos, "type mismatch");
+		return expTy(NULL, Ty_Int());
+	}
 	return expTy(NULL, Ty_Array(arrayTy));
 }
 
@@ -172,12 +176,15 @@ expty transLet(S_table venv, S_table tenv, A_exp a)
 	printf("transLet");
 	A_decList letDecs = a->u.let.decs;
 
+	S_beginScope(tenv); S_beginScope(venv);
 	while(letDecs){
 		transDec(venv, tenv, letDecs->head);
 		letDecs = letDecs->tail;
 	}
 
-	return transExp(venv, tenv, a->u.let.body);
+	expty result = transExp(venv, tenv, a->u.let.body);
+	S_endScope(venv); S_endScope(tenv);
+	return result;
 }
 
 expty transFor(S_table venv, S_table tenv, A_exp a)
@@ -235,8 +242,10 @@ expty transAssign(S_table venv, S_table tenv, A_exp a)
 	expty assignExpTy = transExp(venv, tenv, assignExp);
 	expty assignVarTy = transVar(venv, tenv, assignVar);
 
-	if(actual_ty(assignExpTy.ty) != actual_ty(assignVarTy.ty))
-		EM_error(a->pos, "assign type not same");
+	if(actual_ty(assignExpTy.ty) != actual_ty(assignVarTy.ty)){
+		EM_error(a->pos, "unmatched assign exp");
+		return expTy(NULL, Ty_Int());
+	}
 
 	return expTy(NULL, assignVarTy.ty);
 }
@@ -265,7 +274,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 	Ty_ty originTy = S_look(tenv, recordSym);
 
 	if(!originTy){
-		EM_error(a->pos, "undefined variable2");
+		EM_error(a->pos, "undefined type rectype");
 		return expTy(NULL, Ty_Int());
 	}
 
@@ -338,6 +347,7 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 
 	E_enventry x = S_look(venv, funcSym);
 	if (!x || x->kind != E_funEntry) {
+		//printf("fun sym:%s\n", S_name(funcSym));
 		EM_error(a->pos, "undefined function %s", S_name(a->u.call.func));
 		return expTy(NULL, Ty_Int());
 	}
@@ -347,15 +357,23 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 	expty tmpExpTy;
 	while(funcArgs && funcFormals){
 		tmpExpTy = transExp(venv, tenv, funcArgs->head);
-		if(actual_ty(tmpExpTy.ty) != actual_ty(funcFormals->head))
-			EM_error(funcArgs->head->pos, "args type not same");
+		if(actual_ty(tmpExpTy.ty) != actual_ty(funcFormals->head)){
+			EM_error(funcArgs->head->pos, "para type mismatch");
+			return expTy(NULL, Ty_Int());
+		}
 
 		funcArgs = funcArgs->tail;
 		funcFormals = funcFormals->tail;
 	}
 
-	if(funcArgs || funcFormals)
-		EM_error(a->pos, "the number of args is not same");
+	if(funcArgs){
+		EM_error(a->pos, "too many params in function %s", S_name(funcSym));
+		return expTy(NULL, Ty_Int());
+	}
+	if(funcFormals){
+		EM_error(a->pos, "too less params in function %s", S_name(funcSym));
+		return expTy(NULL, Ty_Int());
+	}
 
 	return expTy(NULL, x->u.fun.result);
 }
@@ -421,7 +439,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 			}
 
 			if(actual_ty(arrVarTy.ty)->kind != Ty_array){
-				EM_error(v->pos, "not Ty_array");
+				EM_error(v->pos, "array type required");
 				return expTy(NULL, Ty_Int());
 			}
 
@@ -525,40 +543,12 @@ void transVarDec(S_table venv, S_table tenv, A_dec d)
 //type of func body must be same as result
 void transFunDec(S_table venv, S_table tenv, A_dec d)
 {
-
+	printf("transFunDec\n");
 	A_fundecList funcList = d->u.function;
 
-	A_fundec tmpFun = NULL;
+	A_fundec tmpFun;
 	while(funcList){
 		tmpFun = funcList->head;
-
-		/*Ty_tyList funFormals = Ty_TyList(NULL, NULL);
-		Ty_tyList funFormalsTail = funFormals;
-
-		A_fieldList funParas = tmpFun->params;
-		A_field tmpField = NULL;
-		while(funParas){ //build formals of fun and check params
-			tmpField = funParas->head;
-
-			Ty_ty tmpTy = S_look(tenv, tmpField->typ);
-
-			//check para type
-			if(!tmpTy)
-				EM_error(tmpField->pos, "undefined para type %s", S_name(tmpField->typ));
-
-			Ty_tyList tmpTyList = Ty_TyList(tmpTy, NULL);
-			//tmpTyList->tail = NULL;
-
-			funFormalsTail->tail = tmpTyList;
-			funFormalsTail = tmpTyList;
-
-			//next param
-			funParas = funParas->tail;
-		}
-
-		Ty_tyList old = funFormals;
-		funFormals = old->tail; //the first is no used
-		free(old);*/
 
 		Ty_tyList funFormals = makeFormals(tenv, tmpFun->params);
 
@@ -572,7 +562,7 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 		}else{
 			funResult = Ty_Void();
 		}
-
+		//printf("func name%s\n", S_name(tmpFun->name));
 		S_enter(venv, tmpFun->name, E_FunEntry(funFormals, funResult));
 
 		//next function
@@ -585,6 +575,8 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 		tmpFun = funcList->head;
 
 		E_enventry x = S_look(venv, tmpFun->name);
+
+		if(!x || x->kind != E_funEntry) printf("check func body: %s\n", S_name(tmpFun->name));
 		Ty_tyList tmpFormals = x->u.fun.formals;
 
 		S_beginScope(tenv);
@@ -592,7 +584,6 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 
 		Ty_tyList i;
 		A_fieldList j;
-
 
 		//add the params to env
 		for(i = tmpFormals, j = tmpFun->params; i; i = i->tail, j = j->tail){
@@ -605,14 +596,13 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 				//Ty_print(x->u.var.ty);
 				//}
 		}
-
 		//printf("loop\n");
 
 		//check body
-		expty tmpBodyTy = transExp(tenv, venv, tmpFun->body);
+		expty tmpBodyTy = transExp(venv, tenv, tmpFun->body);
 
 		if(actual_ty(tmpBodyTy.ty) != actual_ty(x->u.fun.result))
-			EM_error(tmpFun->body->pos, "mismatch type of result");
+			EM_error(tmpFun->body->pos, "procedure returns value");
 
 		S_endScope(tenv);
 		S_endScope(venv);
