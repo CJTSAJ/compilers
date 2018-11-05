@@ -1,0 +1,7 @@
+./testcases/test14.tig:8.40: field name doesn't exist
+SEM_transProg
+transLettransDec
+transTypeDec
+transDec
+transVarDec
+transRecord
