@@ -24,6 +24,10 @@ expty transFor(S_table venv, S_table tenv, A_exp a);
 expty transLet(S_table venv, S_table tenv, A_exp a);
 expty transArray(S_table venv, S_table tenv, A_exp a);
 Ty_ty transRecordTy(S_table tenv, A_ty a);
+void transFunDec(S_table venv, S_table tenv, A_dec d);
+void transVarDec(S_table venv, S_table tenv, A_dec d);
+void transTypeDec(S_table venv, S_table tenv, A_dec d);
+
 //In Lab4, the first argument exp should always be **NULL**.
 expty expTy(Tr_exp exp, Ty_ty ty)
 {
@@ -63,7 +67,7 @@ Ty_ty transTy(S_table tenv, A_ty a)
 			return Ty_Array(arrayTy);
 		}
 		default:{
-			EM_error(a->pos, "undefined type");
+			EM_error(a->pos, "undefined type1");
 			return Ty_Int();
 		}
 	}
@@ -137,6 +141,7 @@ expty transExp(S_table venv, S_table tenv, A_exp a)
 //type-id[exp1] of exp2
 expty transArray(S_table venv, S_table tenv, A_exp a)
 {
+	printf("transArray");
 	Ty_ty arrayTy = S_look(tenv, a->u.array.typ);
 
 	expty sizeTy = transExp(venv, tenv, a->u.array.size);
@@ -154,6 +159,7 @@ expty transArray(S_table venv, S_table tenv, A_exp a)
 
 expty transLet(S_table venv, S_table tenv, A_exp a)
 {
+	printf("transLet");
 	A_decList letDecs = a->u.let.decs;
 
 	while(letDecs){
@@ -172,7 +178,7 @@ expty transFor(S_table venv, S_table tenv, A_exp a)
 	expty forHiTy = transExp(venv, tenv, a->u.forr.hi);
 
 	if(actual_ty(forLoTy.ty)->kind != Ty_int || actual_ty(forHiTy.ty)->kind != Ty_int)
-		EM_error(a->pos, "not int");
+		EM_error(a->pos, "for exp's range type is not integer\nloop variable can't be assigned");
 
 	S_enter(venv, a->u.forr.var, forLoTy.ty);
 
@@ -235,17 +241,19 @@ expty transSeq(S_table venv, S_table tenv, A_exp a)
 //check whether the type of each field of record is same as tyfields
 expty transRecord(S_table venv, S_table tenv, A_exp a)
 {
+	printf("transRecord\n");
 	S_symbol recordSym = a->u.record.typ;
 	A_efieldList recordFields = a->u.record.fields;
+	//printf("%s\n", S_name(recordSym));
 
-	E_enventry x = S_look(venv, recordSym);
+	Ty_ty originTy = S_look(tenv, recordSym);
 
-	if(!x || x->kind != E_varEntry){
-		EM_error(a->pos, "undefined variable");
+	if(!originTy){
+		EM_error(a->pos, "undefined variable2");
 		return expTy(NULL, Ty_Int());
 	}
 
-	Ty_ty originTy = x->u.var.ty;
+	//Ty_ty originTy = x->u.var.ty;
 	if(actual_ty(originTy)->kind != Ty_record)
 		EM_error(a->pos, "not a record");
 
@@ -258,9 +266,12 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 		tmpTyField = originFields->head;
 
 		//name must be same
+		//printf("%s\n", S_name(tmpEfield->name));
+		//printf("%s\n", S_name(tmpTyField->name));
+
 		if(tmpEfield->name != tmpTyField->name)
 			EM_error(a->pos, "field %s doesn't exist", S_name(tmpEfield->name));
-
+		fflush(stdout);
 		expty tmpExpTy = transExp(venv, tenv, tmpEfield->exp);
 
 		if(actual_ty(tmpExpTy.ty) != actual_ty(tmpTyField->ty))
@@ -292,8 +303,10 @@ expty transOp(S_table venv, S_table tenv, A_exp a)
 		if(actual_ty(rightExpTy.ty)->kind != Ty_int)
 			EM_error(rightExp->pos, "integer required");
 	}else{
+		//Ty_print(actual_ty(leftExpTy.ty));
+		//Ty_print(actual_ty(rightExpTy.ty));
 		if(actual_ty(leftExpTy.ty) != actual_ty(rightExpTy.ty))
-			EM_error(a->pos, "not same type");
+			EM_error(a->pos, "same type required");
 	}
 
 	return expTy(NULL, Ty_Int());
@@ -335,7 +348,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 			if(x && x->kind == E_varEntry)
 				return expTy(NULL, actual_ty(x->u.var.ty));
 			else{
-				EM_error(v->pos, "undefined variable %s", S_name(v->u.simple));
+				EM_error(v->pos, "undefined variable3 %s", S_name(v->u.simple));
 				return expTy(NULL, Ty_Int());
 			}
 		}
@@ -401,6 +414,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 
 void transDec(S_table venv, S_table tenv, A_dec d)
 {
+	printf("transDec\n");
 	switch (d->kind) {
 		case A_functionDec:
 			transFunDec(venv, tenv, d);
@@ -419,6 +433,8 @@ void transDec(S_table venv, S_table tenv, A_dec d)
 
 void transTypeDec(S_table venv, S_table tenv, A_dec d)
 {
+	printf("transTypeDec\n");
+
 	A_nametyList nameTyList = d->u.type;
 
 	A_nametyList i;
@@ -434,19 +450,27 @@ void transTypeDec(S_table venv, S_table tenv, A_dec d)
 	}
 }
 
-
+//var maybe have no type
 void transVarDec(S_table venv, S_table tenv, A_dec d)
 {
-	Ty_ty varTy = S_look(tenv, d->u.var.typ);
+	printf("transVarDec\n");
+	//printf("%s\n", S_name(d->u.var.typ));
+
 	expty initTy = transExp(venv, tenv, d->u.var.init);
 
-	//check var type and init type
-	if(actual_ty(varTy) != actual_ty(initTy.ty)){
-		EM_error(d->pos, "type mismatch");
-		return;
-	}
+	if(d->u.var.typ){
+		Ty_ty varTy = S_look(tenv, get_vardec_typ(d));
 
-	S_enter(venv, d->u.var.var, E_VarEntry(varTy));
+		//check var type and init type
+		if(actual_ty(varTy) != actual_ty(initTy.ty)){
+			EM_error(d->pos, "type mismatch");
+			return;
+		}
+
+		S_enter(venv, d->u.var.var, E_VarEntry(varTy));
+	}else{
+		S_enter(venv, d->u.var.var, E_VarEntry(initTy.ty));
+	}
 }
 
 //check params and func body
@@ -523,4 +547,13 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 		//next function
 		funcList = funcList->tail;
 	}
+}
+
+void SEM_transProg(A_exp exp)
+{
+	printf("SEM_transProg\n");
+	S_table venv = E_base_venv();
+	S_table tenv = E_base_tenv();
+
+	transExp(venv, tenv, exp);
 }
