@@ -53,7 +53,7 @@ Ty_ty transTy(S_table tenv, A_ty a)
 		case A_nameTy:{
 			E_enventry x = S_look(tenv, a->u.name);
 			if(!x)
-				EM_error(a->pos, "not found type");
+				EM_error(a->pos, "illegal type cycle");
 
 			return x->u.var.ty;
 		}
@@ -85,11 +85,19 @@ Ty_ty transRecordTy(S_table tenv, A_ty a)
 
 		Ty_ty tmpTy = S_look(tenv, i->head->typ);
 
-		if(!tmpTy)
-			EM_error(i->head->pos, "not found type");
+		if(!tmpTy){
+			EM_error(i->head->pos, "undefined type %s", S_name(i->head->typ));
+			return Ty_Int();
+		}
 
 		tmpTyFieldList->head = Ty_Field(i->head->name, tmpTy);
-		tmpTyFieldList->tail = tmpTail;
+
+		if(i->tail){
+			tmpTyFieldList->tail = tmpTail;
+		}else{
+			tmpTyFieldList->tail = NULL;
+		}
+
 
 		//next ty fieldlist
 		tmpTyFieldList = tmpTail;
@@ -200,13 +208,19 @@ expty transWhile(S_table venv, S_table tenv, A_exp a)
 	return expTy(NULL, Ty_Void());
 }
 
+//then type must be same as else type
 expty transIf(S_table venv, S_table tenv, A_exp a)
 {
+	printf("transIf\n");
 	A_exp ifTest = a->u.iff.test;
 	A_exp ifThen = a->u.iff.then;
 	A_exp ifElse = a->u.iff.elsee;
 
+	expty ifTestTy = transExp(venv, tenv, ifTest);
 	expty ifElseTy = transExp(venv, tenv, ifElse);
+	expty ifThenTy = transExp(venv, tenv, ifThen);
+	if(actual_ty(ifElseTy.ty) != actual_ty(ifThenTy.ty))
+		EM_error(a->pos, "if-then exp's body must produce no value");
 
 	return expTy(NULL, ifElseTy.ty);
 }
@@ -257,7 +271,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 	if(actual_ty(originTy)->kind != Ty_record)
 		EM_error(a->pos, "not a record");
 
-	Ty_fieldList originFields = originTy->u.record;
+	Ty_fieldList originFields = actual_ty(originTy)->u.record;
 
 	Ty_field tmpTyField = NULL;
 	A_efield tmpEfield = NULL;
@@ -291,6 +305,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 //else the type of L$R must be the same;
 expty transOp(S_table venv, S_table tenv, A_exp a)
 {
+	printf("transOp\n");
 	A_exp leftExp = a->u.op.left;
 	A_exp rightExp = a->u.op.right;
 	A_oper oper = a->u.op.oper;
