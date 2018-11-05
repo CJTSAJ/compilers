@@ -1,5 +1,5 @@
 /*
- * types.c - 
+ * types.c -
  *
  * All types and functions declared in this header file begin with "Ty_"
  * Linked list types end with "..list"
@@ -68,7 +68,7 @@ Ty_fieldList Ty_FieldList(Ty_field head, Ty_fieldList tail)
 
 /* printing functions - used for debugging */
 static char str_ty[][12] = {
-   "ty_record", "ty_nil", "ty_int", "ty_string", 
+   "ty_record", "ty_nil", "ty_int", "ty_string",
    "ty_array", "ty_name", "ty_void"};
 
 /* This will infinite loop on mutually recursive types */
@@ -92,4 +92,3 @@ void TyList_print(Ty_tyList list)
     printf(")");
   }
 }
-

@@ -1,0 +1,10 @@
+SEM_transProg
+transLettransDec
+transTypeDec
+transTy
+loop
+name :rectype
+ty_recordtransDec
+transVarDec
+transRecord
+
