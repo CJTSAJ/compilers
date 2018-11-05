@@ -50,13 +50,13 @@ Ty_ty actual_ty(Ty_ty ty)
 
 Ty_ty transTy(S_table tenv, A_ty a)
 {
-	printf("transTy\n");
+	//printf("transTy\n");
 	switch (a->kind) {
 		case A_nameTy:{
 			Ty_ty tmpTy = S_look(tenv, a->u.name);
 			if(!tmpTy)
 				EM_error(a->pos, "illegal type cycle");
-			printf("nameTY\n");
+			//printf("nameTY\n");
 			return Ty_Name(a->u.name, tmpTy);
 		}
 		case A_recordTy:
@@ -110,6 +110,7 @@ Ty_ty transRecordTy(S_table tenv, A_ty a)
 
 expty transExp(S_table venv, S_table tenv, A_exp a)
 {
+	//if(!a) return expTy(NULL, Ty_Int());
 	switch (a->kind) {
 		case A_varExp:
 			return transVar(venv, tenv, a->u.var);
@@ -151,7 +152,7 @@ expty transExp(S_table venv, S_table tenv, A_exp a)
 //type-id[exp1] of exp2
 expty transArray(S_table venv, S_table tenv, A_exp a)
 {
-	printf("transArray");
+	//printf("transArray");
 	Ty_ty arrayTy = S_look(tenv, a->u.array.typ);
 
 	expty sizeTy = transExp(venv, tenv, a->u.array.size);
@@ -173,7 +174,7 @@ expty transArray(S_table venv, S_table tenv, A_exp a)
 
 expty transLet(S_table venv, S_table tenv, A_exp a)
 {
-	printf("transLet");
+	//printf("transLet");
 	A_decList letDecs = a->u.let.decs;
 
 	S_beginScope(tenv); S_beginScope(venv);
@@ -220,7 +221,7 @@ expty transWhile(S_table venv, S_table tenv, A_exp a)
 //then type must be same as else type
 expty transIf(S_table venv, S_table tenv, A_exp a)
 {
-	printf("transIf\n");
+	//printf("transIf\n");
 	A_exp ifTest = a->u.iff.test;
 	A_exp ifThen = a->u.iff.then;
 	A_exp ifElse = a->u.iff.elsee;
@@ -263,8 +264,9 @@ expty transAssign(S_table venv, S_table tenv, A_exp a)
 //return type of the last exp
 expty transSeq(S_table venv, S_table tenv, A_exp a)
 {
+	//printf("transSeq\n");
 	A_expList seqExp = a->u.seq;
-
+	if(!seqExp) return expTy(NULL, Ty_Void());
 	expty result;
 	while(seqExp){
 		result = transExp(venv, tenv, seqExp->head);
@@ -276,7 +278,7 @@ expty transSeq(S_table venv, S_table tenv, A_exp a)
 //check whether the type of each field of record is same as tyfields
 expty transRecord(S_table venv, S_table tenv, A_exp a)
 {
-	printf("transRecord\n");
+	//printf("transRecord\n");
 	S_symbol recordSym = a->u.record.typ;
 	A_efieldList recordFields = a->u.record.fields;
 	//printf("%s\n", S_name(recordSym));
@@ -306,7 +308,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 
 		if(tmpEfield->name != tmpTyField->name)
 			EM_error(a->pos, "field %s doesn't exist", S_name(tmpEfield->name));
-		fflush(stdout);
+
 		expty tmpExpTy = transExp(venv, tenv, tmpEfield->exp);
 
 		if(actual_ty(tmpExpTy.ty) != actual_ty(tmpTyField->ty))
@@ -326,7 +328,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 //else the type of L$R must be the same;
 expty transOp(S_table venv, S_table tenv, A_exp a)
 {
-	printf("transOp\n");
+	//printf("transOp\n");
 	A_exp leftExp = a->u.op.left;
 	A_exp rightExp = a->u.op.right;
 	A_oper oper = a->u.op.oper;
@@ -360,7 +362,7 @@ expty transOp(S_table venv, S_table tenv, A_exp a)
 //check whether the type of args is same as formals
 expty transCall(S_table venv, S_table tenv, A_exp a)
 {
-	printf("transCall\n");
+	//printf("transCall\n");
 	S_symbol funcSym = a->u.call.func;
 	A_expList funcArgs = a->u.call.args;
 
@@ -399,7 +401,7 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 
 expty transVar(S_table venv, S_table tenv, A_var v)
 {
-	printf("transVar\n");
+	//printf("transVar\n");
 	switch (v->kind) {
 		case A_simpleVar:{
 			//find the actual ty of simple var
@@ -474,7 +476,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 
 void transDec(S_table venv, S_table tenv, A_dec d)
 {
-	printf("transDec\n");
+	//printf("transDec\n");
 	switch (d->kind) {
 		case A_functionDec:
 			transFunDec(venv, tenv, d);
@@ -494,7 +496,7 @@ void transDec(S_table venv, S_table tenv, A_dec d)
 
 void transTypeDec(S_table venv, S_table tenv, A_dec d)
 {
-	printf("transTypeDec\n");
+	//printf("transTypeDec\n");
 
 	A_nametyList nameTyList = d->u.type;
 
@@ -519,14 +521,14 @@ void transTypeDec(S_table venv, S_table tenv, A_dec d)
 
 	//detect the illegle cycle
 	for(i = nameTyList; i; i = i->tail){
-		printf("loop\n");
+		//printf("loop\n");
 		Ty_ty beginTy = S_look(tenv, i->head->name);
 		Ty_ty tmpTy = beginTy;
 		//printf("name :%s\n", S_name(tmpTy->u.name.sym));
 		while(tmpTy->kind == Ty_name){
-			printf("name :%s\n", S_name(tmpTy->u.name.sym));
+			//printf("name :%s\n", S_name(tmpTy->u.name.sym));
 			tmpTy = tmpTy->u.name.ty;
-			Ty_print(tmpTy);
+			//Ty_print(tmpTy);
 			if(tmpTy == beginTy){
 				EM_error(d->pos, "illegal type cycle");
 				beginTy->u.name.ty = Ty_Int();
@@ -539,7 +541,7 @@ void transTypeDec(S_table venv, S_table tenv, A_dec d)
 //var maybe have no type
 void transVarDec(S_table venv, S_table tenv, A_dec d)
 {
-	printf("transVarDec\n");
+	//printf("transVarDec\n");
 	//printf("%s\n", S_name(d->u.var.typ));
 
 	expty initTy = transExp(venv, tenv, d->u.var.init);
@@ -573,7 +575,7 @@ void transVarDec(S_table venv, S_table tenv, A_dec d)
 //type of func body must be same as result
 void transFunDec(S_table venv, S_table tenv, A_dec d)
 {
-	printf("transFunDec\n");
+	//printf("transFunDec\n");
 	A_fundecList funcList = d->u.function;
 
 	A_fundec tmpFun;
@@ -613,7 +615,7 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 
 		E_enventry x = S_look(venv, tmpFun->name);
 
-		if(!x || x->kind != E_funEntry) printf("check func body: %s\n", S_name(tmpFun->name));
+		//if(!x || x->kind != E_funEntry) printf("check func body: %s\n", S_name(tmpFun->name));
 		Ty_tyList tmpFormals = x->u.fun.formals;
 
 		S_beginScope(tenv);
@@ -661,7 +663,7 @@ Ty_tyList makeFormals(S_table tenv, A_fieldList params)
 
 void SEM_transProg(A_exp exp)
 {
-	printf("SEM_transProg\n");
+	//printf("SEM_transProg\n");
 
 	S_table venv = E_base_venv();
 	S_table tenv = E_base_tenv();
