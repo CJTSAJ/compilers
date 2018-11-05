@@ -491,6 +491,7 @@ void transTypeDec(S_table venv, S_table tenv, A_dec d)
 			Ty_print(tmpTy);
 			if(tmpTy == beginTy){
 				EM_error(d->pos, "illegal type cycle");
+				beginTy->u.name.ty = Ty_Int();
 				break;
 			}
 		}
