@@ -13,6 +13,13 @@ typedef struct F_accessList_ *F_accessList;
 
 struct F_accessList_ {F_access head; F_accessList tail;};
 
+//my code
+F_accessList F_AccessList(F_access head, F_accessList tail);
+F_frame F_newFrame(Temp_label name, U_boolList formals);
+Temp_label F_name(F_frame f);
+F_accessList F_formals(F_frame f);
+F_access F_allocLocal(F_frame f, bool escape);
+
 
 /* declaration for fragments */
 typedef struct F_frag_ *F_frag;
@@ -27,9 +34,9 @@ F_frag F_StringFrag(Temp_label label, string str);
 F_frag F_ProcFrag(T_stm body, F_frame frame);
 
 typedef struct F_fragList_ *F_fragList;
-struct F_fragList_ 
+struct F_fragList_
 {
-	F_frag head; 
+	F_frag head;
 	F_fragList tail;
 };
 

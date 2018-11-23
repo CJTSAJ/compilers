@@ -19,7 +19,7 @@ struct Tr_access_ {
 
 struct Tr_accessList_ {
 	Tr_access head;
-	Tr_accessList tail;	
+	Tr_accessList tail;
 };
 
 struct Tr_level_ {
@@ -28,16 +28,16 @@ struct Tr_level_ {
 };
 
 typedef struct patchList_ *patchList;
-struct patchList_ 
+struct patchList_
 {
-	Temp_label *head; 
+	Temp_label *head;
 	patchList tail;
 };
 
-struct Cx 
+struct Cx
 {
-	patchList trues; 
-	patchList falses; 
+	patchList trues;
+	patchList falses;
 	T_stm stm;
 };
 
@@ -71,3 +71,24 @@ patchList joinPatch(patchList first, patchList second)
 	return first;
 }
 
+
+//Activation Records
+Tr_level Tr_outermost(void)
+{
+	return Tr_newLevel(NULL, Temp_newlabel(), NULL);
+}
+
+Tr_level Tr_newLevel(Tr_level parent, Temp_label name, U_boolList formals)
+{
+	Tr_level tmpLevel = checked_malloc(sizeof(tmpLevel));
+	tmpLevel->parent = parent;
+	F_frame tmpFrame = F_newFrame(name, formals);
+	return tmpLevel;
+}
+
+Tr_access Tr_allocLocal(Tr_level level, bool escape)
+{
+	Tr_access tmpAccess = checked_malloc(sizeof(*tmpAccess));
+	tmpAccess = F_allocLocal(level, escape);
+	return tmpAccess;
+}
