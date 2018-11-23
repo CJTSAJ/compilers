@@ -105,7 +105,11 @@ static struct Cx unCx(Tr_exp e)
 		case Tr_Cx:
 			return e->u.cx;
 		case Tr_Ex:{
-			
+			struct Cx c;
+			c.stm = T_Cjump(T_ne, e->u.ex, T_Const(0), NULL, NULL);
+			c.trues = PatchList(&(c->u.stm.u.CJUMP.true), NULL);
+			c.falses = PatchList(&(c->u.stm.u.CJUMP.true), NULL);
+			return c;
 		}
 		case Tr_Nx:
 			assert(0); //can not transform to Cx
@@ -113,6 +117,23 @@ static struct Cx unCx(Tr_exp e)
 	assert 0;
 }
 
+static T_stm unNx(Tr_exp e)
+{
+	switch (e->kind) {
+		case Tr_Nx:
+			return e->u.nx;
+		case Tr_Ex:
+			return T_Exp(e->u.ex); //T_Exp calculate exp but not return result
+		case Tr_Cx:{
+			Temp_label empty = Temp_newlabel();
+			// no matter true or false, just jump to empty
+			doPatch(e->u.cx.trues, empty);
+			doPatch(e->u.cx.falses, empty);
+			return T_Seq(e->u.cx.stm, T_Label(empty));
+		}
+	}
+	assert(0);
+}
 
 static patchList PatchList(Temp_label *head, patchList tail)
 {
@@ -137,7 +158,6 @@ patchList joinPatch(patchList first, patchList second)
 	first->tail = second;
 	return first;
 }
-
 
 //Activation Records
 Tr_level Tr_outermost(void)
@@ -183,4 +203,11 @@ Tr_accessList Tr_formals(Tr_level level)
 {
 	F_accessList fa = F_formals(level->frame);
 	return FA2TrAccessLis(fa, level);
+}
+
+//IR
+Tr_exp Tr_simpleVar(Tr_access access, Tr_level level)
+{
+	T_exp fp = T_Temp(F_FP());
+	
 }

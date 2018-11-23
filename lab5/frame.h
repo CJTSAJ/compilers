@@ -20,6 +20,7 @@ Temp_label F_name(F_frame f);
 F_accessList F_formals(F_frame f);
 F_access F_allocLocal(F_frame f, bool escape);
 
+Temp_temp F_FP(void); //current value of fp
 
 /* declaration for fragments */
 typedef struct F_frag_ *F_frag;

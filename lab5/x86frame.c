@@ -29,6 +29,11 @@ struct F_access_ {
 	} u;
 };
 
+Temp_temp F_FP(void)
+{
+	return Temp_newtemp();
+}
+
 F_accessList F_AccessList(F_access head, F_accessList tail)
 {
 	F_accessList fa = checked_malloc(sizeof(*fa));

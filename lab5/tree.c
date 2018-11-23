@@ -15,7 +15,7 @@ T_stmList T_StmList(T_stm head, T_stmList tail)
  p->head=head; p->tail=tail;
  return p;
 }
- 
+
 T_stm T_Seq(T_stm left, T_stm right)
 {T_stm p = (T_stm) checked_malloc(sizeof *p);
  p->kind=T_SEQ;
@@ -30,7 +30,7 @@ T_stm T_Label(Temp_label label)
  p->u.LABEL=label;
  return p;
 }
- 
+
 T_stm T_Jump(T_exp exp, Temp_labelList labels)
 {T_stm p = (T_stm) checked_malloc(sizeof *p);
  p->kind=T_JUMP;
@@ -39,7 +39,7 @@ T_stm T_Jump(T_exp exp, Temp_labelList labels)
  return p;
 }
 
-T_stm T_Cjump(T_relOp op, T_exp left, T_exp right, 
+T_stm T_Cjump(T_relOp op, T_exp left, T_exp right,
 	      Temp_label true, Temp_label false)
 {T_stm p = (T_stm) checked_malloc(sizeof *p);
  p->kind=T_CJUMP;
@@ -48,7 +48,7 @@ T_stm T_Cjump(T_relOp op, T_exp left, T_exp right,
  p->u.CJUMP.false=false;
  return p;
 }
- 
+
 T_stm T_Move(T_exp dst, T_exp src)
 {T_stm p = (T_stm) checked_malloc(sizeof *p);
  p->kind=T_MOVE;
@@ -56,14 +56,14 @@ T_stm T_Move(T_exp dst, T_exp src)
  p->u.MOVE.src=src;
  return p;
 }
- 
+
 T_stm T_Exp(T_exp exp)
 {T_stm p = (T_stm) checked_malloc(sizeof *p);
  p->kind=T_EXP;
  p->u.EXP=exp;
  return p;
 }
- 
+
 T_exp T_Binop(T_binOp op, T_exp left, T_exp right)
 {T_exp p = (T_exp) checked_malloc(sizeof *p);
  p->kind=T_BINOP;
@@ -72,21 +72,21 @@ T_exp T_Binop(T_binOp op, T_exp left, T_exp right)
  p->u.BINOP.right=right;
  return p;
 }
- 
+
 T_exp T_Mem(T_exp exp)
 {T_exp p = (T_exp) checked_malloc(sizeof *p);
  p->kind=T_MEM;
  p->u.MEM=exp;
  return p;
 }
- 
+
 T_exp T_Temp(Temp_temp temp)
 {T_exp p = (T_exp) checked_malloc(sizeof *p);
  p->kind=T_TEMP;
  p->u.TEMP=temp;
  return p;
 }
- 
+
 T_exp T_Eseq(T_stm stm, T_exp exp)
 {T_exp p = (T_exp) checked_malloc(sizeof *p);
  p->kind=T_ESEQ;
@@ -94,21 +94,21 @@ T_exp T_Eseq(T_stm stm, T_exp exp)
  p->u.ESEQ.exp=exp;
  return p;
 }
- 
+
 T_exp T_Name(Temp_label name)
 {T_exp p = (T_exp) checked_malloc(sizeof *p);
  p->kind=T_NAME;
  p->u.NAME=name;
  return p;
 }
- 
+
 T_exp T_Const(int consti)
 {T_exp p = (T_exp) checked_malloc(sizeof *p);
  p->kind=T_CONST;
  p->u.CONST=consti;
  return p;
 }
- 
+
 T_exp T_Call(T_exp fun, T_expList args)
 {T_exp p = (T_exp) checked_malloc(sizeof *p);
  p->kind=T_CALL;
@@ -149,5 +149,3 @@ T_relOp T_commute(T_relOp r)
    }
  assert(0); return 0;
 }
-
-

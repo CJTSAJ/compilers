@@ -27,4 +27,5 @@ Tr_accessList Tr_formals(Tr_level level);
 Tr_access Tr_allocLocal(Tr_level level, bool escape);
 
 
+Tr_exp Tr_simpleVar(Tr_access access, Tr_level level);
 #endif
