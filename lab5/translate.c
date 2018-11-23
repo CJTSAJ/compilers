@@ -92,3 +92,28 @@ Tr_access Tr_allocLocal(Tr_level level, bool escape)
 	tmpAccess = F_allocLocal(level, escape);
 	return tmpAccess;
 }
+
+Tr_accessList FA2TrAccessLis(F_accessList fa, Tr_level level)
+{
+	Tr_access ta = checked_malloc(sizeof(*ta));
+	ta->level = level;
+	ta->access = fa->head;
+	if(fa->tail)
+		return Tr_AccessList(ta, FA2TrAccessLis(fa->tail, level));
+	else
+		return Tr_AccessList(ta, NULL);
+}
+
+Tr_accessList Tr_AccessList(Tr_access head, Tr_accessList tail)
+{
+	Tr_accessList ta = checked_malloc(sizeof(*ta));
+	ta->head = head;
+	ta->tail = tail;
+	return ta;
+}
+
+Tr_accessList Tr_formals(Tr_level level)
+{
+	F_accessList fa = F_formals(level->frame);
+	return FA2TrAccessLis(fa, level);
+}
