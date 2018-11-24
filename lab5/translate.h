@@ -28,4 +28,5 @@ Tr_access Tr_allocLocal(Tr_level level, bool escape);
 
 
 Tr_exp Tr_simpleVar(Tr_access access, Tr_level level);
+Tr_exp Tr_fieldVar(Tr_access acc, Tr_level l, int cnt);
 #endif

@@ -205,9 +205,47 @@ Tr_accessList Tr_formals(Tr_level level)
 	return FA2TrAccessLis(fa, level);
 }
 
-//IR
-Tr_exp Tr_simpleVar(Tr_access access, Tr_level level)
+//trans var
+Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l)
 {
 	T_exp fp = T_Temp(F_FP());
+	while(acc->level != l){ //track up
+		//static link in a word off fp
+		fp = T_Mem(T_Binop(T_plus, fp, T_Const(F_wordSize)));
+		l = l->parent;
+	}
+
+	return Tr_Ex(F_Exp(access->access, fp));
+}
+
+Tr_exp Tr_fieldVar(Tr_access acc, Tr_level l, int num)
+{
+	Tr_exp accAddr = Tr_simpleVar(acc, l);
+	T_exp valueExp = T_Mem(T_Binop(T_plus, accAddr->u.ex, F_wordSize*num));
+	return Tr_Ex(valueExp);
+}
+
+Tr_exp Tr_subscriptVar(Tr_access acc, Tr_level l, Tr_exp e)
+{
+	Tr_exp accAddr = Tr_simpleVar(acc, l);
+	T_exp valueExp = T_Mem(T_Binop(T_plus, accAddr->u.ex, e->u.ex));
+	return Tr_Ex(valueExp);
+}
+
+//trans exp
+Tr_exp Tr_nilExp()
+{
+    return Tr_Ex(T_Const(0));
+}
+
+Tr_exp Tr_intExp(int i)
+{
+    return Tr_Ex(T_Const(i));
+}
+
+Tr_exp Tr_stringExp()
+{
 	
 }
+
+Tr_exp Tr_callExp()
