@@ -28,6 +28,11 @@ struct F_access_ {
 	} u;
 };
 
+T_exp F_externalCall(string s, T_expList args)
+{
+	return T_Call(T_Name(Temp_namedlabel(s)), args);
+}
+
 Temp_temp F_FP(void)
 {
 	return Temp_newtemp();
@@ -142,5 +147,5 @@ F_fragList F_FragList(F_frag head, F_fragList tail)
 	F_fragList l = checked_malloc(sizeof(*l));
 	l->head = head;
 	l->tail = tail;
-	return l; 
+	return l;
 }

@@ -43,6 +43,7 @@ struct F_fragList_
 	F_fragList tail;
 };
 
+T_exp F_externalCall(string s, T_expList args);
 F_fragList F_FragList(F_frag head, F_fragList tail);
 
 #endif

@@ -30,6 +30,7 @@ void transTypeDec(S_table venv, S_table tenv, A_dec d);
 Ty_tyList makeFormals(S_table tenv, A_fieldList params);
 
 //In Lab4, the first argument exp should always be **NULL**.
+//in lab5, add the the first argument exp
 expty expTy(Tr_exp exp, Ty_ty ty)
 {
 	expty e;
@@ -107,28 +108,28 @@ Ty_ty transRecordTy(S_table tenv, A_ty a)
 	return Ty_Record(tyList);
 }
 
-expty transExp(S_table venv, S_table tenv, A_exp a)
+expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l)
 {
 	//if(!a) return expTy(NULL, Ty_Int());
 	switch (a->kind) {
 		case A_varExp:
-			return transVar(venv, tenv, a->u.var);
+			return transVar(venv, tenv, a->u.var, l);
 		case A_nilExp:
-			return expTy(NULL, Ty_Nil());
+			return expTy(Tr_nilExp(), Ty_Nil());
 		case A_intExp:
-			return expTy(NULL, Ty_Int());
+			return expTy(Tr_intExp(), Ty_Int());
 		case A_stringExp:
-			return expTy(NULL, Ty_String());
+			return expTy(Tr_stringExp(a->u.stringg), Ty_String());
 		case A_callExp:
-			return transCall(venv, tenv, a);
+			return transCall(venv, tenv, a, l);
 		case A_opExp:
-			return transOp(venv, tenv, a);
+			return transOp(venv, tenv, a, l);
 		case A_recordExp:
-		 	return transRecord(venv, tenv, a);
+		 	return transRecord(venv, tenv, a, l);
 		case A_seqExp:
-			return transSeq(venv, tenv, a);
+			return transSeq(venv, tenv, a, l);
 		case A_assignExp:
-			return transAssign(venv, tenv, a);
+			return transAssign(venv, tenv, a, l);
 		case A_ifExp:
 			return transIf(venv, tenv, a);
 		case A_whileExp:
@@ -218,16 +219,16 @@ expty transWhile(S_table venv, S_table tenv, A_exp a)
 }
 
 //then type must be same as else type
-expty transIf(S_table venv, S_table tenv, A_exp a)
+expty transIf(S_table venv, S_table tenv, A_exp a, Tr_level l)
 {
 	//printf("transIf\n");
 	A_exp ifTest = a->u.iff.test;
 	A_exp ifThen = a->u.iff.then;
 	A_exp ifElse = a->u.iff.elsee;
 
-	expty ifTestTy = transExp(venv, tenv, ifTest);
-	expty ifElseTy = transExp(venv, tenv, ifElse);
-	expty ifThenTy = transExp(venv, tenv, ifThen);
+	expty ifTestTy = transExp(venv, tenv, ifTest, l);
+	expty ifElseTy = transExp(venv, tenv, ifElse, l);
+	expty ifThenTy = transExp(venv, tenv, ifThen, l);
 
 	if(actual_ty(ifElseTy.ty)->kind == Ty_nil){
 		EM_error(a->pos, "if-then exp's body must produce no value");
@@ -244,38 +245,40 @@ expty transIf(S_table venv, S_table tenv, A_exp a)
 	return expTy(NULL, ifElseTy.ty);
 }
 
-expty transAssign(S_table venv, S_table tenv, A_exp a)
+expty transAssign(S_table venv, S_table tenv, A_exp a, Tr_level l)
 {
 	A_var assignVar = a->u.assign.var;
 	A_exp assignExp = a->u.assign.exp;
 
-	expty assignExpTy = transExp(venv, tenv, assignExp);
-	expty assignVarTy = transVar(venv, tenv, assignVar);
+	expty assignExpTy = transExp(venv, tenv, assignExp, l);
+	expty assignVarTy = transVar(venv, tenv, assignVar, l);
 
 	if(actual_ty(assignExpTy.ty) != actual_ty(assignVarTy.ty)){
 		EM_error(a->pos, "unmatched assign exp");
 		return expTy(NULL, Ty_Int());
 	}
 
-	return expTy(NULL, assignVarTy.ty);
+	Tr_exp trExp = Tr_assignExp(assignVarTy.exp, assignExpTy.exp);
+	return expTy(trExp, assignVarTy.ty);
 }
 
 //return type of the last exp
-expty transSeq(S_table venv, S_table tenv, A_exp a)
+expty transSeq(S_table venv, S_table tenv, A_exp a, Tr_level l)
 {
 	//printf("transSeq\n");
 	A_expList seqExp = a->u.seq;
 	if(!seqExp) return expTy(NULL, Ty_Void());
 	expty result;
 	while(seqExp){
-		result = transExp(venv, tenv, seqExp->head);
+		result = transExp(venv, tenv, seqExp->head, l);
 		seqExp = seqExp->tail;
 	}
 
 	return result;
 }
 //check whether the type of each field of record is same as tyfields
-expty transRecord(S_table venv, S_table tenv, A_exp a)
+// type-id{id=exp1,id=exp2....}
+expty transRecord(S_table venv, S_table tenv, A_exp a, Tr_level l)
 {
 	//printf("transRecord\n");
 	S_symbol recordSym = a->u.record.typ;
@@ -294,6 +297,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 
 	Ty_fieldList originFields = actual_ty(originTy)->u.record;
 
+	Tr_expList trFields = NULL;//for translate
 	Ty_field tmpTyField = NULL;
 	A_efield tmpEfield = NULL;
 	while(recordFields && originFields){
@@ -304,7 +308,8 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 		if(tmpEfield->name != tmpTyField->name)
 			EM_error(a->pos, "field %s doesn't exist", S_name(tmpEfield->name));
 
-		expty tmpExpTy = transExp(venv, tenv, tmpEfield->exp);
+		expty tmpExpTy = transExp(venv, tenv, tmpEfield->exp, l);
+		trFields = Tr_ExpList(tmpExpTy->exp, trFields);
 
 		if(actual_ty(tmpExpTy.ty) != actual_ty(tmpTyField->ty))
 			EM_error(a->pos, "record type not match");
@@ -316,20 +321,22 @@ expty transRecord(S_table venv, S_table tenv, A_exp a)
 	if(originFields || recordFields)
 		EM_error(a->pos, "the number of field not match");
 
-	return expTy(NULL, originTy);
+	Tr_exp trExp = Tr_recordExp(trFields);
+	return expTy(trExp, originTy);
 }
 
 //the type of L$R must be int when the op is +-*/
 //else the type of L$R must be the same;
-expty transOp(S_table venv, S_table tenv, A_exp a)
+expty transOp(S_table venv, S_table tenv, A_exp a, Tr_level l)
 {
 	//printf("transOp\n");
 	A_exp leftExp = a->u.op.left;
 	A_exp rightExp = a->u.op.right;
 	A_oper oper = a->u.op.oper;
 
-	expty leftExpTy = transExp(venv, tenv, leftExp);
-	expty rightExpTy = transExp(venv, tenv, rightExp);
+	Tr_exp trExp;
+	expty leftExpTy = transExp(venv, tenv, leftExp, l);
+	expty rightExpTy = transExp(venv, tenv, rightExp, l);
 	if(oper == A_plusOp || oper == A_minusOp || oper == A_timesOp || oper == A_divideOp){
 		if(actual_ty(leftExpTy.ty)->kind != Ty_int){
 			EM_error(leftExp->pos, "integer required");
@@ -341,19 +348,21 @@ expty transOp(S_table venv, S_table tenv, A_exp a)
 			return expTy(NULL, Ty_Int());
 		}
 
+		trExp = Tr_arithExp(oper, leftExpTy->exp, rightExpTy->exp);
 	}else{
 		if(actual_ty(leftExpTy.ty) != actual_ty(rightExpTy.ty)){
 			EM_error(a->pos, "same type required");
 			return expTy(NULL, Ty_Int());
 		}
 
+		trExp = Tr_compExp(oper, leftExpTy->exp, rightExpTy->exp);
 	}
 
-	return expTy(NULL, Ty_Int());
+	return expTy(trExp, Ty_Int());
 }
 
 //check whether the type of args is same as formals
-expty transCall(S_table venv, S_table tenv, A_exp a)
+expty transCall(S_table venv, S_table tenv, A_exp a, Tr_level l)
 {
 	//printf("transCall\n");
 	S_symbol funcSym = a->u.call.func;
@@ -368,6 +377,7 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 	Ty_tyList funcFormals = x->u.fun.formals;
 
 	expty tmpExpTy;
+	Tr_expList trArgs = NULL;
 	while(funcArgs && funcFormals){
 		tmpExpTy = transExp(venv, tenv, funcArgs->head);
 		if(actual_ty(tmpExpTy.ty) != actual_ty(funcFormals->head)){
@@ -377,6 +387,8 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 
 		funcArgs = funcArgs->tail;
 		funcFormals = funcFormals->tail;
+
+		trArgs = Tr_ExpList(tmpExpTy->exp, trArgs);
 	}
 
 	if(funcArgs){
@@ -387,11 +399,11 @@ expty transCall(S_table venv, S_table tenv, A_exp a)
 		EM_error(a->pos, "too less params in function %s", S_name(funcSym));
 		return expTy(NULL, Ty_Int());
 	}
-
-	return expTy(NULL, x->u.fun.result);
+	Tr_exp trExp = Tr_callExp(x->u.fun.label, trArgs, l, x->u.fun.level);
+	return expTy(trExp, x->u.fun.result);
 }
 
-expty transVar(S_table venv, S_table tenv, A_var v)
+expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l)
 {
 	//printf("transVar\n");
 	switch (v->kind) {
@@ -399,7 +411,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 			//find the actual ty of simple var
 			E_enventry x = S_look(venv, v->u.simple);
 			if(x && x->kind == E_varEntry){
-				return expTy(NULL, actual_ty(x->u.var.ty));
+				return expTy(Tr_simpleVar(x->u.var.access, l), actual_ty(x->u.var.ty));
 			}
 			else{
 				EM_error(v->pos, "undefined variable %s", S_name(v->u.simple));
@@ -411,7 +423,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 			A_var fieldCase = v->u.field.var; //field.id
 			S_symbol idSym = v->u.field.sym;
 
-			expty fieldCaseTy = transVar(venv, tenv, fieldCase);
+			expty fieldCaseTy = transVar(venv, tenv, fieldCase, l);
 			Ty_ty fieldActualTy = actual_ty(fieldCaseTy.ty);
 
 			if(fieldActualTy->kind != Ty_record){
@@ -422,11 +434,13 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 			//find the ty from the field case
 			Ty_fieldList fieldList = fieldActualTy->u.record;
 			Ty_field tmpField = NULL;
+			int count = 0
 			while(fieldList){
 				if(fieldList->head->name == idSym){
 					tmpField = fieldList->head;
 					break;
 				}
+				count ++;
 				fieldList = fieldList->tail;
 			}
 
@@ -436,7 +450,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 				return expTy(NULL, Ty_Int());
 			}
 
-			return expTy(NULL, tmpField->ty);
+			return expTy(Tr_fieldVar(fieldCaseTy.exp, count), tmpField->ty);
 		}
 		case A_subscriptVar:{
 			//find the actual type of the array
@@ -457,7 +471,7 @@ expty transVar(S_table venv, S_table tenv, A_var v)
 				return expTy(NULL, Ty_Int());
 			}
 
-			return expTy(NULL, arrVarTy.ty->u.array);
+			return expTy(Tr_subscriptVar(arrVarTy->exp, arrExpTy->exp), arrVarTy.ty->u.array);
 		}
 		default:{
 			EM_error(v->pos, "strange variable type %d", v->kind);

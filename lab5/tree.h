@@ -48,7 +48,7 @@ T_stmList T_StmList (T_stm head, T_stmList tail);
 T_stm T_Seq(T_stm left, T_stm right);
 T_stm T_Label(Temp_label);
 T_stm T_Jump(T_exp exp, Temp_labelList labels);
-T_stm T_Cjump(T_relOp op, T_exp left, T_exp right, 
+T_stm T_Cjump(T_relOp op, T_exp left, T_exp right,
 	      Temp_label true, Temp_label false);
 T_stm T_Move(T_exp, T_exp);
 T_stm T_Exp(T_exp);
