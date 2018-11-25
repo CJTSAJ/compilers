@@ -493,7 +493,7 @@ expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_label lab)
 	}
 }
 
-void transDec(S_table venv, S_table tenv, A_dec d)
+Tr_exp transDec(S_table venv, S_table tenv, A_dec d)
 {
 	//printf("transDec\n");
 	switch (d->kind) {
@@ -513,7 +513,7 @@ void transDec(S_table venv, S_table tenv, A_dec d)
 	return;
 }
 
-void transTypeDec(S_table venv, S_table tenv, A_dec d)
+Tr_exp transTypeDec(S_table venv, S_table tenv, A_dec d)
 {
 	//printf("transTypeDec\n");
 
@@ -558,10 +558,10 @@ void transTypeDec(S_table venv, S_table tenv, A_dec d)
 }
 
 //var maybe have no type
-void transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
+Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
 {
 	expty initTy = transExp(venv, tenv, d->u.var.init, l, lab);
-
+	Tr_access acc = Tr_allocLocal(l, d->u.var.escape);
 	if(d->u.var.typ){
 		Ty_ty varTy = S_look(tenv, get_vardec_typ(d));
 
@@ -571,17 +571,17 @@ void transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab
 			return;
 		}
 
-		S_enter(venv, d->u.var.var, E_VarEntry(varTy));
+		S_enter(venv, d->u.var.var, E_VarEntry(acc, varTy));
 	}else{
 		if(initTy.ty){
 			if(actual_ty(initTy.ty)->kind != Ty_nil)
-				S_enter(venv, d->u.var.var, E_VarEntry(initTy.ty));
+				S_enter(venv, d->u.var.var, E_VarEntry(acc, initTy.ty));
 			else{
 				EM_error(d->pos, "init should not be nil without type specified");
 				return;
 			}
 		}else{
-			S_enter(venv, d->u.var.var, E_VarEntry(Ty_Void()));
+			S_enter(venv, d->u.var.var, E_VarEntry(acc, Ty_Void()));
 		}
 
 	}
@@ -589,7 +589,7 @@ void transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab
 
 //check params and func body
 //type of func body must be same as result
-void transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
+Tr_exp transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
 {
 	//printf("transFunDec\n");
 	A_fundecList funcList = d->u.function;
@@ -618,7 +618,12 @@ void transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab
 			funResult = Ty_Void();
 		}
 
-		S_enter(venv, tmpFun->name, E_FunEntry(funFormals, funResult));
+		//init func
+		Temp_label funLab = Temp_newlabel();
+		U_boolList escapeList = makeBoolList(tmpFun->params);
+		Tr_level funLevel = Tr_newLevel(l, funLab, escapeList);
+
+		S_enter(venv, tmpFun->name, E_FunEntry(funLevel, funLab, funFormals, funResult));
 
 		//next function
 		funcList = funcList->tail;
@@ -645,7 +650,7 @@ void transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab
 		}
 
 		//check body
-		expty tmpBodyTy = transExp(venv, tenv, tmpFun->body, l, lab);
+		expty tmpBodyTy = transExp(venv, tenv, tmpFun->body, x->u.fun.level, lab);
 
 		if(actual_ty(tmpBodyTy.ty) != actual_ty(x->u.fun.result))
 			EM_error(tmpFun->body->pos, "procedure returns value");
@@ -656,6 +661,14 @@ void transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab
 		//next function
 		funcList = funcList->tail;
 	}
+}
+
+U_boolList makeBoolList(A_fieldList params)
+{
+	if(!params)
+		return NULL;
+
+	return U_BoolList(params->head->escape, makeBoolList(params->tail));
 }
 
 Ty_tyList makeFormals(S_table tenv, A_fieldList params)

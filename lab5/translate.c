@@ -220,7 +220,7 @@ Tr_accessList Tr_formals(Tr_level level)
 	return FA2TrAccessLis(fa, level);
 }
 
-//trans var
+//trans var, get the addr of the simpleVar
 Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l)
 {
 	T_exp fp = T_Temp(F_FP());
@@ -453,5 +453,27 @@ Tr_exp Tr_arrayExp(Tr_exp size, Tr_exp init)
 
 Tr_exp Tr_typeDec()
 {
-    return Tr_Ex(T_Const(0));
+  return Tr_Ex(T_Const(0));
+}
+
+//move the exp to the addr of var
+Tr_exp Tr_varDec(Tr_access acc, Tr_exp e)
+{
+	T_exp addr = unEx(Tr_simpleVar(acc, acc->level));
+	T_stm moveStm = T_Move(addr, unEx(e));
+	return Tr_Nx(moveStm);
+}
+
+//add frag to fraglist
+void Tr_procEntryExit(Tr_level level, Tr_exp body, Tr_accessList formals)
+{
+	//return reg
+	T_stm moveStm = T_Move(T_Temp(F_RV()), unEx(body));
+	F_frag newFrag = F_ProcFrag(moveStm, level->frame);
+	frags = F_FragList(newFrag, frags);
+}
+
+F_fragList Tr_getResult(void)
+{
+	return frags;
 }

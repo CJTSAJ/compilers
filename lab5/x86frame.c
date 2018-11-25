@@ -28,6 +28,11 @@ struct F_access_ {
 	} u;
 };
 
+Temp_temp F_RV(void)
+{
+	return Temp_newtemp();
+}
+
 T_exp F_externalCall(string s, T_expList args)
 {
 	return T_Call(T_Name(Temp_namedlabel(s)), args);
