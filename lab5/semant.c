@@ -108,12 +108,13 @@ Ty_ty transRecordTy(S_table tenv, A_ty a)
 	return Ty_Record(tyList);
 }
 
-expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l)
+//lab5: label for break, jump out loop
+expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//if(!a) return expTy(NULL, Ty_Int());
 	switch (a->kind) {
 		case A_varExp:
-			return transVar(venv, tenv, a->u.var, l);
+			return transVar(venv, tenv, a->u.var, l, lab);
 		case A_nilExp:
 			return expTy(Tr_nilExp(), Ty_Nil());
 		case A_intExp:
@@ -131,15 +132,15 @@ expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l)
 		case A_assignExp:
 			return transAssign(venv, tenv, a, l);
 		case A_ifExp:
-			return transIf(venv, tenv, a);
+			return transIf(venv, tenv, a, l);
 		case A_whileExp:
-			return transWhile(venv, tenv, a);
+			return transWhile(venv, tenv, a, l, lab);
 		case A_forExp:
-			return transFor(venv, tenv, a);
+			return transFor(venv, tenv, a, l, lab);
 		case A_breakExp:
-			return expTy(NULL, Ty_Void());
+			return expTy(Tr_breakExp(label), Ty_Void());
 		case A_letExp:
-			return transLet(venv, tenv, a);
+			return transLet(venv, tenv, a, l, lab);
 		case A_arrayExp:
 			return transArray(venv, tenv, a);
 		default:{
@@ -150,13 +151,13 @@ expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l)
 }
 
 //type-id[exp1] of exp2
-expty transArray(S_table venv, S_table tenv, A_exp a)
+expty transArray(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//printf("transArray");
 	Ty_ty arrayTy = S_look(tenv, a->u.array.typ);
 
-	expty sizeTy = transExp(venv, tenv, a->u.array.size);
-	expty initTy = transExp(venv, tenv, a->u.array.init);
+	expty sizeTy = transExp(venv, tenv, a->u.array.size, l, lab);
+	expty initTy = transExp(venv, tenv, a->u.array.init, l, lab);
 	if(actual_ty(arrayTy)->kind != Ty_array)
 		EM_error(a->pos, "not a array type");
 
@@ -169,10 +170,12 @@ expty transArray(S_table venv, S_table tenv, A_exp a)
 		EM_error(a->u.array.init->pos, "type mismatch");
 		return expTy(NULL, Ty_Int());
 	}
-	return expTy(NULL, Ty_Array(arrayTy));
+
+	Tr_exp trExp = Tr_arrayExp(sizeTy.exp, initTy.exp);
+	return expTy(trExp, Ty_Array(arrayTy));
 }
 
-expty transLet(S_table venv, S_table tenv, A_exp a)
+expty transLet(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//printf("transLet");
 	A_decList letDecs = a->u.let.decs;
@@ -183,17 +186,21 @@ expty transLet(S_table venv, S_table tenv, A_exp a)
 		letDecs = letDecs->tail;
 	}
 
-	expty result = transExp(venv, tenv, a->u.let.body);
+	expty result = transExp(venv, tenv, a->u.let.body, l, lab);
 	S_endScope(venv); S_endScope(tenv);
 	return result;
 }
 
-expty transFor(S_table venv, S_table tenv, A_exp a)
+//break? done?
+expty transFor(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	S_beginScope(venv);
 
-	expty forLoTy = transExp(venv, tenv, a->u.forr.lo);
-	expty forHiTy = transExp(venv, tenv, a->u.forr.hi);
+	expty forLoTy = transExp(venv, tenv, a->u.forr.lo, l, lab);
+	expty forHiTy = transExp(venv, tenv, a->u.forr.hi, l, lab);
+
+	expty forBodyTy = transExp(venv, tenv, a->u.forr.body, l, lab);
+	Temp_label done = Temp_newlabel();
 
 	if(actual_ty(forLoTy.ty)->kind != Ty_int || actual_ty(forHiTy.ty)->kind != Ty_int)
 		EM_error(a->pos, "for exp's range type is not integer\nloop variable can't be assigned");
@@ -202,33 +209,39 @@ expty transFor(S_table venv, S_table tenv, A_exp a)
 
 	S_endScope(venv);
 
+	Tr_exp trExp = Tr_forExp(forLoTy.exp, forHiTy.exp, forBodyTy.exp, done);
 	return expTy(NULL, Ty_Void());
 }
 
 //while body no value
-expty transWhile(S_table venv, S_table tenv, A_exp a)
+// break? done?
+expty transWhile(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	A_exp whileTest = a->u.whilee.test;
 	A_exp whileBody = a->u.whilee.body;
 
-	expty whileBodyTy = transExp(venv, tenv, whileBody);
+	Temp_label done = Temp_newlabel();
+
+	expty whileBodyTy = transExp(venv, tenv, whileBody, l, lab);
+	expty whileTestTy = transExp(venv, tenv, whileTest, l, lab);
 	if(whileBodyTy.ty->kind != Ty_void)
 		EM_error(a->pos, "while body must produce no value");
 
-	return expTy(NULL, Ty_Void());
+	Tr_exp trExp = Tr_whileExp(whileTestTy.exp, whileBodyTy.exp, done);
+	return expTy(TrExp, Ty_Void());
 }
 
 //then type must be same as else type
-expty transIf(S_table venv, S_table tenv, A_exp a, Tr_level l)
+expty transIf(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//printf("transIf\n");
 	A_exp ifTest = a->u.iff.test;
 	A_exp ifThen = a->u.iff.then;
 	A_exp ifElse = a->u.iff.elsee;
 
-	expty ifTestTy = transExp(venv, tenv, ifTest, l);
-	expty ifElseTy = transExp(venv, tenv, ifElse, l);
-	expty ifThenTy = transExp(venv, tenv, ifThen, l);
+	expty ifTestTy = transExp(venv, tenv, ifTest, l, lab);
+	expty ifElseTy = transExp(venv, tenv, ifElse, l, lab);
+	expty ifThenTy = transExp(venv, tenv, ifThen, l, lab);
 
 	if(actual_ty(ifElseTy.ty)->kind == Ty_nil){
 		EM_error(a->pos, "if-then exp's body must produce no value");
@@ -241,17 +254,17 @@ expty transIf(S_table venv, S_table tenv, A_exp a, Tr_level l)
 		}
 	}
 
-
-	return expTy(NULL, ifElseTy.ty);
+	Tr_exp trExp = Tr_ifExp(ifTestTy.exp, ifThenTy.exp, ifElseTy.exp);
+	return expTy(trExp, ifElseTy.ty);
 }
 
-expty transAssign(S_table venv, S_table tenv, A_exp a, Tr_level l)
+expty transAssign(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	A_var assignVar = a->u.assign.var;
 	A_exp assignExp = a->u.assign.exp;
 
-	expty assignExpTy = transExp(venv, tenv, assignExp, l);
-	expty assignVarTy = transVar(venv, tenv, assignVar, l);
+	expty assignExpTy = transExp(venv, tenv, assignExp, l, lab);
+	expty assignVarTy = transVar(venv, tenv, assignVar, l, lab);
 
 	if(actual_ty(assignExpTy.ty) != actual_ty(assignVarTy.ty)){
 		EM_error(a->pos, "unmatched assign exp");
@@ -263,14 +276,14 @@ expty transAssign(S_table venv, S_table tenv, A_exp a, Tr_level l)
 }
 
 //return type of the last exp
-expty transSeq(S_table venv, S_table tenv, A_exp a, Tr_level l)
+expty transSeq(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//printf("transSeq\n");
 	A_expList seqExp = a->u.seq;
 	if(!seqExp) return expTy(NULL, Ty_Void());
 	expty result;
 	while(seqExp){
-		result = transExp(venv, tenv, seqExp->head, l);
+		result = transExp(venv, tenv, seqExp->head, l, lab);
 		seqExp = seqExp->tail;
 	}
 
@@ -278,7 +291,7 @@ expty transSeq(S_table venv, S_table tenv, A_exp a, Tr_level l)
 }
 //check whether the type of each field of record is same as tyfields
 // type-id{id=exp1,id=exp2....}
-expty transRecord(S_table venv, S_table tenv, A_exp a, Tr_level l)
+expty transRecord(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//printf("transRecord\n");
 	S_symbol recordSym = a->u.record.typ;
@@ -308,7 +321,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a, Tr_level l)
 		if(tmpEfield->name != tmpTyField->name)
 			EM_error(a->pos, "field %s doesn't exist", S_name(tmpEfield->name));
 
-		expty tmpExpTy = transExp(venv, tenv, tmpEfield->exp, l);
+		expty tmpExpTy = transExp(venv, tenv, tmpEfield->exp, l, lab);
 		trFields = Tr_ExpList(tmpExpTy->exp, trFields);
 
 		if(actual_ty(tmpExpTy.ty) != actual_ty(tmpTyField->ty))
@@ -327,7 +340,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a, Tr_level l)
 
 //the type of L$R must be int when the op is +-*/
 //else the type of L$R must be the same;
-expty transOp(S_table venv, S_table tenv, A_exp a, Tr_level l)
+expty transOp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//printf("transOp\n");
 	A_exp leftExp = a->u.op.left;
@@ -335,8 +348,8 @@ expty transOp(S_table venv, S_table tenv, A_exp a, Tr_level l)
 	A_oper oper = a->u.op.oper;
 
 	Tr_exp trExp;
-	expty leftExpTy = transExp(venv, tenv, leftExp, l);
-	expty rightExpTy = transExp(venv, tenv, rightExp, l);
+	expty leftExpTy = transExp(venv, tenv, leftExp, l, lab);
+	expty rightExpTy = transExp(venv, tenv, rightExp, l, lab);
 	if(oper == A_plusOp || oper == A_minusOp || oper == A_timesOp || oper == A_divideOp){
 		if(actual_ty(leftExpTy.ty)->kind != Ty_int){
 			EM_error(leftExp->pos, "integer required");
@@ -362,7 +375,7 @@ expty transOp(S_table venv, S_table tenv, A_exp a, Tr_level l)
 }
 
 //check whether the type of args is same as formals
-expty transCall(S_table venv, S_table tenv, A_exp a, Tr_level l)
+expty transCall(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//printf("transCall\n");
 	S_symbol funcSym = a->u.call.func;
@@ -379,7 +392,7 @@ expty transCall(S_table venv, S_table tenv, A_exp a, Tr_level l)
 	expty tmpExpTy;
 	Tr_expList trArgs = NULL;
 	while(funcArgs && funcFormals){
-		tmpExpTy = transExp(venv, tenv, funcArgs->head);
+		tmpExpTy = transExp(venv, tenv, funcArgs->head, l, lab);
 		if(actual_ty(tmpExpTy.ty) != actual_ty(funcFormals->head)){
 			EM_error(funcArgs->head->pos, "para type mismatch");
 			return expTy(NULL, Ty_Int());
@@ -403,7 +416,7 @@ expty transCall(S_table venv, S_table tenv, A_exp a, Tr_level l)
 	return expTy(trExp, x->u.fun.result);
 }
 
-expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l)
+expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_label lab)
 {
 	//printf("transVar\n");
 	switch (v->kind) {
@@ -423,7 +436,7 @@ expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l)
 			A_var fieldCase = v->u.field.var; //field.id
 			S_symbol idSym = v->u.field.sym;
 
-			expty fieldCaseTy = transVar(venv, tenv, fieldCase, l);
+			expty fieldCaseTy = transVar(venv, tenv, fieldCase, l, lab);
 			Ty_ty fieldActualTy = actual_ty(fieldCaseTy.ty);
 
 			if(fieldActualTy->kind != Ty_record){
@@ -458,8 +471,8 @@ expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l)
 			A_var arrVar = v->u.subscript.var;
 			A_exp arrExp = v->u.subscript.exp;
 
-			expty arrExpTy = transExp(venv, tenv, arrExp);
-			expty arrVarTy = transVar(venv, tenv, arrVar);
+			expty arrExpTy = transExp(venv, tenv, arrExp, l, lab);
+			expty arrVarTy = transVar(venv, tenv, arrVar, l, lab);
 
 			if(actual_ty(arrExpTy.ty)->kind != Ty_int){
 				EM_error(v->pos, "wrong index");
@@ -545,9 +558,9 @@ void transTypeDec(S_table venv, S_table tenv, A_dec d)
 }
 
 //var maybe have no type
-void transVarDec(S_table venv, S_table tenv, A_dec d)
+void transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
 {
-	expty initTy = transExp(venv, tenv, d->u.var.init);
+	expty initTy = transExp(venv, tenv, d->u.var.init, l, lab);
 
 	if(d->u.var.typ){
 		Ty_ty varTy = S_look(tenv, get_vardec_typ(d));
@@ -576,7 +589,7 @@ void transVarDec(S_table venv, S_table tenv, A_dec d)
 
 //check params and func body
 //type of func body must be same as result
-void transFunDec(S_table venv, S_table tenv, A_dec d)
+void transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
 {
 	//printf("transFunDec\n");
 	A_fundecList funcList = d->u.function;
@@ -632,7 +645,7 @@ void transFunDec(S_table venv, S_table tenv, A_dec d)
 		}
 
 		//check body
-		expty tmpBodyTy = transExp(venv, tenv, tmpFun->body);
+		expty tmpBodyTy = transExp(venv, tenv, tmpFun->body, l, lab);
 
 		if(actual_ty(tmpBodyTy.ty) != actual_ty(x->u.fun.result))
 			EM_error(tmpFun->body->pos, "procedure returns value");

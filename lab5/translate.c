@@ -356,7 +356,7 @@ Tr_exp Tr_recordExp(Tr_expList fields)
 		assign = T_Seq(T_Move(dst, unEx(fields->head)), assign);
 	}
 
-	T_exp callMalloc = F_externalCall("malloc", T_ExpList(T_Const(count*F_wordSize)));
+	T_exp callMalloc = F_externalCall("malloc", T_ExpList(T_Const(count*F_wordSize), NULL));
 	T_stm mallocStm = T_Move(recordAddr, callMalloc);
 
 	return T_Eseq(T_Seq(mallocStm, assign), recordAddr);
@@ -367,7 +367,91 @@ Tr_exp Tr_assignExp(Tr_exp left, Tr_exp right)
 	return Tr_Nx(T_Move(unEx(left), unEx(right)));
 }
 
-Tr_exp Tr_ifExp()
+// bug
+Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee)
 {
-	
+	Temp_label truee = Temp_newlabel(), falsee = Temp_newlabel();
+	struct Cx testCx = unCx(test);
+	doPatch(testCx.trues, truee);doPatch(testCx.falses, falsee);
+
+	T_stm thenStm;
+	if(then->kind == Tr_cx)
+		thenStm = then->u.cx.stm;
+	else
+		thenStm = unNx(test);
+
+	T_stm elseStm;
+	if(elsee->kind == Tr_cx)
+		elseStm = elsee->u.cx.stm;
+	else
+		elseStm = unNx(test);
+
+	T_stm s =  T_Seq(testCx.stm,
+							T_Seq(T_Label(truee),
+					 		 T_Seq(thenStm,
+					  	 	T_Seq(T_Label(falsee),
+						 		 elseStm))));
+	return unNx(s);
+}
+
+Tr_exp Tr_whileExp(Tr_exp test, Tr_exp body, Temp_label doneLab)
+{
+	Temp_label testLab = Temp_newlabel(), bodyLab = Temp_newlabel();
+	struct Cx testCx = unCx(test);
+	doPatch(testCx.trues, bodyLab);
+	doPatch(testCx.falses, doneLab);
+
+	T_stm testStm = T_Seq(T_Label(testLab), testCx.stm);
+	T_stm bodyStm = T_Seq(T_Label(bodyLab),
+									 T_Seq(unNx(body),
+									  T_Seq(T_Jump(T_Name(testLab), Temp_LabelList(testLab, NULL)),
+										 T_Label(doneLab))));
+	return Tr_Nx(T_Seq(testStm, bodyStm));
+}
+
+Tr_exp Tr_forExp(Tr_exp low, Tr_exp high, Tr_exp body, Temp_label doneLab)
+{
+	T_exp iterator = T_Temp(Temp_newtemp());
+	T_exp lowTree = unEx(low), highTree = unEx(high);
+	Temp_label bodyLab = Temp_newlabel(), testLab = Temp_newlabel();
+	T_stm bodyTree = unNx(body);
+
+	//assign the iterator ,put the label and test
+	T_stm init = T_Move(iterator, lowTree);
+	T_stm test = T_Seq(T_Label(testLab),
+							  T_Cjump(T_le, iterator, highTree, bodyLab, doneLab));
+
+	T_stm update = T_Move(iterator, T_Binop(T_plus, iterator, T_Const(1)));
+	T_stm toTest = T_Jump(T_Name(testLab), Temp_LabelList(testLab, NULL));
+
+	// put bodyLab ,exe body and jumpto test
+	T_stm bodyLoop = T_Seq(T_Label(bodyLab), T_Seq(bodyTree,
+									 T_Seq(update,
+									  T_Seq(toTest,
+										 T_Label(doneLab))));
+
+	//init and test
+	T_stm testLoop = T_Seq(init, test);
+
+	return Tr_Nx(T_Seq(testLoop, bodyLoop));
+}
+
+Tr_exp Tr_breakExp(Temp_label doneLab)
+{
+	return Tr_Nx(T_Jump(T_Name(doneLab), Temp_LabelList(doneLab, NULL)))
+}
+
+Tr_exp Tr_arrayExp(Tr_exp size, Tr_exp init)
+{
+	T_exp tmp = T_Temp(Temp_newtemp());
+	T_exp callResult = F_externalCall("initArray",
+							 T_ExpList(unEx(size), T_ExpList(unEx(init), NULL)));
+
+	T_stm assign = T_Move(tmp, callResult);
+	return Tr_Ex(T_Eseq(assign, tmp));
+}
+
+Tr_exp Tr_typeDec()
+{
+    return Tr_Ex(T_Const(0));
 }
