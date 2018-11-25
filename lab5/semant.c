@@ -668,12 +668,16 @@ Ty_tyList makeFormals(S_table tenv, A_fieldList params)
 	}
 }
 
-void SEM_transProg(A_exp exp)
+F_fragList SEM_transProg(A_exp exp)
 {
 	//printf("SEM_transProg\n");
 
 	S_table venv = E_base_venv();
 	S_table tenv = E_base_tenv();
 
-	transExp(venv, tenv, exp);
+	Temp_label startLab = Temp_newlabel();
+	Tr_level OMLevel = Tr_newLevel(Tr_outermost(), startLab, NULL);
+	transExp(venv, tenv, exp, OMLevel, startLab);
+
+	return ;
 }
