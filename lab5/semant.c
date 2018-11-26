@@ -170,7 +170,7 @@ expty transArray(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab
 		return expTy(NULL, Ty_Int());
 	}
 
-	if(actual_ty(initTy.ty)->kind != Ty_int){
+	if(actual_ty(initTy.ty) != actual_ty(actual_ty(arrayTy)->u.array)){
 		EM_error(a->u.array.init->pos, "type mismatch2");
 		return expTy(NULL, Ty_Int());
 	}
@@ -276,7 +276,8 @@ expty transAssign(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label la
 	expty assignExpTy = transExp(venv, tenv, assignExp, l, lab);
 	expty assignVarTy = transVar(venv, tenv, assignVar, l, lab);
 
-	if(actual_ty(assignExpTy.ty) != actual_ty(assignVarTy.ty)){
+	if(actual_ty(assignExpTy.ty) != actual_ty(assignVarTy.ty)
+			&& assignExpTy.ty->kind != Ty_nil){
 		EM_error(a->pos, "unmatched assign exp");
 		return expTy(NULL, Ty_Int());
 	}
@@ -338,7 +339,8 @@ expty transRecord(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label la
 		expty tmpExpTy = transExp(venv, tenv, tmpEfield->exp, l, lab);
 		trFields = Tr_ExpList(tmpExpTy.exp, trFields);
 
-		if(actual_ty(tmpExpTy.ty) != actual_ty(tmpTyField->ty))
+		if(actual_ty(tmpExpTy.ty) != actual_ty(tmpTyField->ty)
+				&& tmpExpTy.ty->kind != Ty_nil)
 			EM_error(a->pos, "record type not match");
 
 		recordFields = recordFields->tail;
@@ -598,7 +600,7 @@ Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 		Ty_ty varTy = S_look(tenv, get_vardec_typ(d));
 
 		//check var type and init type
-		if(actual_ty(varTy) != actual_ty(initTy.ty)){
+		if(actual_ty(varTy) != actual_ty(initTy.ty) && initTy.ty->kind != Ty_nil){
 			EM_error(d->pos, "type mismatch5");
 			return Tr_typeDec();
 		}
@@ -627,6 +629,16 @@ Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 	return Tr_varDec(acc, initTy.exp);
 }
 
+int funcRepeat(A_fundecList funcList, S_symbol funcSym)
+{
+	if(funcList == NULL) return 0;
+	for(;funcList; funcList = funcList->tail){
+		if(S_name(funcList->head->name) == S_name(funcSym))
+			return 1;
+	}
+	return 0;
+}
+
 //check params and func body
 //type of func body must be same as result
 Tr_exp transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
@@ -638,10 +650,15 @@ Tr_exp transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 	while(funcList){
 		tmpFun = funcList->head;
 
-		if(S_look(venv, tmpFun->name)){
+		/*if(S_look(venv, tmpFun->name)){
+			EM_error(d->pos, "two functions have the same name");
+			return Tr_typeDec();
+		}*/
+		if(funcRepeat(funcList->tail, tmpFun->name)){
 			EM_error(d->pos, "two functions have the same name");
 			return Tr_typeDec();
 		}
+
 		Ty_tyList funFormals = makeFormals(tenv, tmpFun->params);
 
 		Ty_ty funResult;
