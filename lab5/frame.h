@@ -13,6 +13,23 @@ typedef struct F_accessList_ *F_accessList;
 
 struct F_accessList_ {F_access head; F_accessList tail;};
 
+struct F_frame_{
+	Temp_label name;
+	F_accessList formals;
+	F_accessList locals;
+	int argSize;
+	int stackOff;
+};
+
+//varibales
+struct F_access_ {
+	enum {inFrame, inReg} kind;
+	union {
+		int offset; //inFrame
+		Temp_temp reg; //inReg
+	} u;
+};
+
 //my code
 F_accessList F_AccessList(F_access head, F_accessList tail);
 F_frame F_newFrame(Temp_label name, U_boolList formals);

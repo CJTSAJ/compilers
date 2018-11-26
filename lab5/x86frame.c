@@ -11,22 +11,7 @@
 
 const int F_wordSize = 8;//64 bit
 /*Lab5: Your implementation here.*/
-struct F_frame_{
-	Temp_label name;
-	F_accessList formals;
-	F_accessList locals;
-	int argSize;
-	int stackOff;
-};
 
-//varibales
-struct F_access_ {
-	enum {inFrame, inReg} kind;
-	union {
-		int offset; //inFrame
-		Temp_temp reg; //inReg
-	} u;
-};
 
 Temp_temp F_RV(void)
 {
@@ -61,6 +46,7 @@ F_accessList F_AccessList(F_access head, F_accessList tail)
 
 static F_access InFrame(int offset)
 {
+
 	F_access tmpAccess = checked_malloc(sizeof(*tmpAccess));
 	tmpAccess->kind = inFrame;
 	tmpAccess->u.offset = offset;
@@ -75,6 +61,20 @@ static F_access InReg(Temp_temp reg)
 	return tmpAccess;
 }
 
+F_accessList makeAccList(U_boolList formals)
+{
+	if(!formals)
+		return NULL;
+
+	F_access tmpAccess;int count = 0;
+	if(formals->head){//if escape
+		tmpAccess = InFrame(count * F_wordSize);
+		count++;
+	}else	tmpAccess = InReg(Temp_newtemp());
+
+	return F_AccessList(tmpAccess, makeAccList(formals->tail));
+}
+
 F_frame F_newFrame(Temp_label name, U_boolList formals)
 {
 	F_frame resultFrame = checked_malloc(sizeof(*resultFrame));
@@ -82,26 +82,25 @@ F_frame F_newFrame(Temp_label name, U_boolList formals)
 	resultFrame->locals = NULL;
 	resultFrame->stackOff = 0;
 
-
-	F_accessList resultFormals = F_accessList(NULL, NULL), iterator = resultFormals;
+	/*F_accessList resultFormals = F_AccessList(NULL, NULL);
+	F_accessList iterator = resultFormals;*/
+	resultFrame->formals = makeAccList(formals);
 
 	//build formals of result
-	F_access tmpAccess; int count = 0;
+	/*F_access tmpAccess; int count = 0;
 	for(; formals; formals = formals->tail){
 		if(formals->head){//if escape
 			count++;
 			tmpAccess = InFrame(count * F_wordSize);
 		}else	tmpAccess = InReg(Temp_newtemp());
 
-		iterator = iterator->tail;
-		iterator = F_accessList(tmpAccess, NULL);
+		//iterator = iterator->tail;
+		resultFormals = F_AccessList(tmpAccess, resultFormals);
 	}
 	//free the first node
-	int old = resultFormals;
+	F_accessList old = resultFormals;
 	resultFormals = resultFormals->tail;
-	free(old);
-
-	resultFrame->formals = resultFormals;
+	free(old);*/
 
 	return resultFrame;
 }
@@ -119,6 +118,9 @@ F_accessList F_formals(F_frame f)
 F_access F_allocLocal(F_frame f, bool escape)
 {
 	F_access tmpAccess;
+	//printf("%d\n", escape);
+
+	//printf("%d\n",f->stackOff );
 	if(escape)
 		tmpAccess = InFrame(f->stackOff);
 	else
