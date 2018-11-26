@@ -159,7 +159,7 @@ Tr_level Tr_newLevel(Tr_level parent, Temp_label name, U_boolList formals)
 
 Tr_access Tr_allocLocal(Tr_level level, bool escape)
 {
-	printf("Tr_allocLocal\n");
+	//printf("Tr_allocLocal\n");
 	Tr_access tmpAccess = checked_malloc(sizeof(*tmpAccess));
 	tmpAccess->access = F_allocLocal(level->frame, escape);
 
@@ -237,7 +237,7 @@ Tr_exp Tr_intExp(int i)
 
 Tr_exp Tr_stringExp(string s)
 {
-	printf("Tr_stringExp: %s\n", s);
+	//printf("Tr_stringExp: %s\n", s);
 	Temp_label lab = Temp_newlabel();
 	F_frag sFrag = F_StringFrag(lab, s);
 	frags = F_FragList(sFrag, frags);
@@ -355,6 +355,7 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee)
 
 	//if-then
 	if(elsee == NULL){
+		//printf("elsee NULL\n");
 		T_stm thenStm;
 		if(then->kind == Tr_cx)
 			thenStm = then->u.cx.stm;
@@ -370,6 +371,7 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee)
 		T_stm s =  T_Seq(testCx.stm,
 								T_Seq(T_Label(truee),
 						 		 T_Seq(thenStm,T_Label(falsee))));
+
 		return Tr_Nx(s);
 	}else{
 		//if-then-else

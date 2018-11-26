@@ -113,7 +113,7 @@ Ty_ty transRecordTy(S_table tenv, A_ty a)
 expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//if(!a) return expTy(NULL, Ty_Int());
-	printf("transExp: kind: %d\n", a->kind);fflush(stdout);
+	//printf("transExp: kind: %d\n", a->kind);
 
 	switch (a->kind) {
 		case A_varExp:
@@ -180,7 +180,7 @@ expty transArray(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab
 
 expty transLet(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
-	printf("transLet\n");
+	//printf("transLet\n");
 	A_decList letDecs = a->u.let.decs;
 
 	S_beginScope(tenv); S_beginScope(venv);
@@ -240,7 +240,7 @@ expty transWhile(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab
 //then type must be same as else type
 expty transIf(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
-	printf("transIf\n");
+	//printf("transIf\n");
 	A_exp ifTest = a->u.iff.test;
 	A_exp ifThen = a->u.iff.then;
 	A_exp ifElse = a->u.iff.elsee;
@@ -249,10 +249,10 @@ expty transIf(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 	expty ifThenTy = transExp(venv, tenv, ifThen, l, lab);
 	expty ifElseTy = transExp(venv, tenv, ifElse, l, lab);
 
-
 	if(actual_ty(ifElseTy.ty)->kind == Ty_nil){
+		//printf("else ty_nil\n");
 		//EM_error(a->pos, "if-then exp's body must produce no value");
-		return expTy(Tr_ifExp(ifTestTy.exp, ifThenTy.exp, ifElseTy.exp), ifThenTy.ty);
+		return expTy(Tr_ifExp(ifTestTy.exp, ifThenTy.exp, NULL), ifThenTy.ty);
 	}
 	else{
 		if(actual_ty(ifElseTy.ty) != actual_ty(ifThenTy.ty)){
@@ -349,7 +349,7 @@ expty transRecord(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label la
 //else the type of L$R must be the same;
 expty transOp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
-	printf("transOp\n");
+	//printf("transOp\n");
 	A_exp leftExp = a->u.op.left;
 	A_exp rightExp = a->u.op.right;
 	A_oper oper = a->u.op.oper;
@@ -385,7 +385,7 @@ expty transOp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 //check whether the type of args is same as formals
 expty transCall(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
-	printf("transCall: %s\n", S_name(a->u.call.func));
+	//printf("transCall: %s\n", S_name(a->u.call.func));
 	S_symbol funcSym = a->u.call.func;
 	A_expList funcArgs = a->u.call.args;
 
@@ -423,15 +423,18 @@ expty transCall(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 
 	Tr_exp trExp = Tr_callExp(x->u.fun.label, trArgs, l, x->u.fun.level);
 
-	return expTy(trExp, x->u.fun.result);
+	if(x->u.fun.result)
+		return expTy(trExp, x->u.fun.result);
+	else
+		return expTy(trExp, Ty_Void());
 }
 
 expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_label lab)
 {
-	printf("transVar\n");
+	//printf("transVar\n");
 	switch (v->kind) {
 		case A_simpleVar:{
-			printf("simpleVar: %s\n", S_name(v->u.simple));
+			//printf("simpleVar: %s\n", S_name(v->u.simple));
 			//find the actual ty of simple var
 			E_enventry x = S_look(venv, v->u.simple);
 			if(x && x->kind == E_varEntry){
@@ -446,7 +449,7 @@ expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_label lab)
 			//find the actual type of field.id
 			A_var fieldCase = v->u.field.var; //field.id
 			S_symbol idSym = v->u.field.sym;
-			printf("A_fieldVar: %s\n", S_name(idSym));
+			//printf("A_fieldVar: %s\n", S_name(idSym));
 
 			expty fieldCaseTy = transVar(venv, tenv, fieldCase, l, lab);
 			Ty_ty fieldActualTy = actual_ty(fieldCaseTy.ty);
@@ -508,7 +511,7 @@ expty transVar(S_table venv, S_table tenv, A_var v, Tr_level l, Temp_label lab)
 
 Tr_exp transDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
 {
-	printf("transDec\n");
+	//printf("transDec\n");
 	switch (d->kind) {
 		case A_functionDec:
 			return transFunDec(venv, tenv, d, l, lab);
@@ -575,7 +578,7 @@ Tr_exp transTypeDec(S_table venv, S_table tenv, A_dec d)
 //var maybe have no type
 Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
 {
-	printf("transVarDec\n");
+	//printf("transVarDec\n");
 	expty initTy = transExp(venv, tenv, d->u.var.init, l, lab);
 	Tr_access acc = Tr_allocLocal(l, d->u.var.escape);
 
@@ -592,7 +595,7 @@ Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 	}else{
 
 		if(initTy.ty){
-			printf("no type var trans\n");
+			//printf("no type var trans\n");
 			if(actual_ty(initTy.ty)->kind != Ty_nil)
 				S_enter(venv, d->u.var.var, E_VarEntry(acc, initTy.ty));
 			else{
@@ -612,7 +615,7 @@ Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 //type of func body must be same as result
 Tr_exp transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label lab)
 {
-	printf("transFunDec\n");
+	//printf("transFunDec\n");
 	A_fundecList funcList = d->u.function;
 
 	A_fundec tmpFun;
@@ -653,7 +656,7 @@ Tr_exp transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 	//check func body
 	funcList = d->u.function;
 	while(funcList){
-		printf("funcList\n");
+		//printf("funcList\n");
 		tmpFun = funcList->head;
 
 		E_enventry x = S_look(venv, tmpFun->name);
@@ -676,20 +679,21 @@ Tr_exp transFunDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 		//check body
 		expty tmpBodyTy = transExp(venv, tenv, tmpFun->body, x->u.fun.level, lab);
 
-		if(x->u.fun.result){
+		S_endScope(tenv);
+		S_endScope(venv);
+		if(tmpFun->result){
 			if(actual_ty(tmpBodyTy.ty) != actual_ty(x->u.fun.result)){
 				EM_error(tmpFun->body->pos, "false return type");
 				return Tr_typeDec();
 			}
-		}else{//no result
+		}else{//no type result
+
 			if(actual_ty(tmpBodyTy.ty)->kind != Ty_void){
 				EM_error(tmpFun->body->pos, "procedure returns value");
 				return Tr_typeDec();
 			}
-		}
 
-		S_endScope(tenv);
-		S_endScope(venv);
+		}
 
 		Tr_procEntryExit(x->u.fun.level, tmpBodyTy.exp);
 		//next function
@@ -719,7 +723,7 @@ Ty_tyList makeFormals(S_table tenv, A_fieldList params)
 
 F_fragList SEM_transProg(A_exp exp)
 {
-	printf("SEM_transProg\n");
+	//printf("SEM_transProg\n");
 
 	S_table venv = E_base_venv();
 	S_table tenv = E_base_tenv();
