@@ -15,6 +15,55 @@
 
 struct Temp_temp_ {int num;};
 
+bool Temp_in(Temp_tempList tl, Temp_temp t)
+{
+	for (; tl; tl = tl->tail) {
+		if (Temp_int(tl->head) == Temp_int(t))
+			return TRUE;
+	}
+	return FALSE;
+}
+
+void Temp_remove(Temp_tempList tl, Temp_temp t)
+{
+	Temp_tempList result = tl;
+	Temp_tempList prev = NULL;
+	for (; tl; tl = tl->tail) {
+		if (Temp_int(tl->head) == Temp_int(t)) {
+			if (prev) {
+				// consider the last node
+				prev->tail = tl->tail;
+				continue;
+			}
+			else { //the head has no prev
+				result = result->tail;
+				continue;
+			}
+		}
+
+		prev = tl;
+	}
+}
+
+Temp_tempList Temp_diff(Temp_tempList t1, Temp_tempList t2)
+{
+	Temp_tempList ret = NULL;
+	for (; t1; t1 = t1->tail) {
+		if (!Temp_in(t2, t1->head))
+			ret = Temp_TempList(t1->head, ret);
+	}
+	return ret;
+}
+
+Temp_tempList Temp_union(Temp_tempList t1, Temp_tempList t2)
+{
+	for (Temp_tempList it = t2; it; it = it->tail) {
+		if (!Temp_in(t1, it->head))
+			t1 = Temp_TempList(it->head, t1);
+	}
+	return t1;
+}
+
 int Temp_int(Temp_temp t)
 {
 	return t->num;
@@ -91,7 +140,7 @@ string Temp_look(Temp_map m, Temp_temp t) {
   else return NULL;
 }
 
-Temp_tempList Temp_TempList(Temp_temp h, Temp_tempList t) 
+Temp_tempList Temp_TempList(Temp_temp h, Temp_tempList t)
 {Temp_tempList p = (Temp_tempList) checked_malloc(sizeof (*p));
  p->head=h; p->tail=t;
  return p;

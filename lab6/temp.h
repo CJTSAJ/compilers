@@ -14,6 +14,11 @@ typedef struct Temp_tempList_ *Temp_tempList;
 struct Temp_tempList_ { Temp_temp head; Temp_tempList tail;};
 Temp_tempList Temp_TempList(Temp_temp h, Temp_tempList t);
 
+// my helper func
+Temp_tempList Temp_union(Temp_tempList t1, Temp_tempList t2);
+Temp_tempList Temp_diff(Temp_tempList t1, Temp_tempList t2);
+Temp_tempList Temp_same(Temp_tempList t1, Temp_tempList t2);
+
 typedef S_symbol Temp_label;
 Temp_label Temp_newlabel(void);
 Temp_label Temp_namedlabel(string name);

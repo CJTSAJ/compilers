@@ -18,7 +18,7 @@
 #include "canon.h"
 #include "prabsyn.h"
 #include "printtree.h"
-#include "escape.h" 
+#include "escape.h"
 #include "parse.h"
 #include "codegen.h"
 #include "regalloc.h"
@@ -30,7 +30,7 @@ extern bool anyErrors;
  * 2. initialize the register lists (for register allocation)
  * 3. do register allocation
  * 4. output (print) the assembly code of each function
- 
+
  * Uncommenting the following printf can help you debugging.*/
 
 /* print the assembly language instructions to filename.s */
@@ -70,10 +70,25 @@ static void doProc(FILE *out, F_frame frame, T_stm body)
  //G_graph fg = FG_AssemFlowGraph(iList);  /* 10.1 */
  struct RA_result ra = RA_regAlloc(frame, iList);  /* 11 */
 
+/*
  fprintf(out, "BEGIN function\n");
  AS_printInstrList (out, proc->body,
                        Temp_layerMap(F_tempMap, ra.coloring));
- fprintf(out, "END function\n");
+ fprintf(out, "END function\n");*/
+
+ proc =	F_procEntryExit3(frame, ra.il);
+ string procName = S_name(F_name(frame));
+
+ fprintf(out, ".text\n");
+ fprintf(out, ".globl %s\n", procName);
+ fprintf(out, ".type %s, @function\n", procName);
+ fprintf(out, "%s:\n", procName);
+
+ //prologue
+ fprintf(out, "%s", proc->prolog);
+ AS_printInstrList (out, proc->body,
+                       Temp_layerMap(F_tempMap, ra.coloring));
+ fprintf(out, "%s", proc->epilog);
 
  //Part of TA's implementation. Just for reference.
  /*
@@ -86,7 +101,7 @@ static void doProc(FILE *out, F_frame frame, T_stm body)
  fprintf(out, ".type %s, @function\n", procName);
  fprintf(out, "%s:\n", procName);
 
- 
+
  //fprintf(stdout, "%s:\n", Temp_labelstring(F_name(frame)));
  //prologue
  fprintf(out, "%s", proc->prolog);
@@ -126,7 +141,7 @@ int main(int argc, string *argv)
    absyn_root = parse(argv[1]);
    if (!absyn_root)
      return 1;
-     
+
 #if 0
    pr_exp(out, absyn_root, 0); /* print absyn data structure */
    fprintf(out, "\n");
@@ -134,9 +149,13 @@ int main(int argc, string *argv)
 
    //Lab 6: escape analysis
    //If you have implemented escape analysis, uncomment this
-   //Esc_findEscape(absyn_root); /* set varDec's escape field */
+   printf("----======before Esc_findEscape=======-----\n");
+   Esc_findEscape(absyn_root); /* set varDec's escape field */
 
+   F_tempMap = Temp_empty();
+   printf("----======before SEM_transProg=======-----\n");
    frags = SEM_transProg(absyn_root);
+   printf("----======after SEM_transProg=======-----\n");
    if (anyErrors) return 1; /* don't continue */
 
    /* convert the filename */
@@ -147,7 +166,7 @@ int main(int argc, string *argv)
      if (frags->head->kind == F_procFrag) {
        doProc(out, frags->head->u.proc.frame, frags->head->u.proc.body);
 	 }
-     else if (frags->head->kind == F_stringFrag) 
+     else if (frags->head->kind == F_stringFrag)
 	   doStr(out, frags->head->u.stringg.label, frags->head->u.stringg.str);
 
    fclose(out);
