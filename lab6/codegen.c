@@ -150,6 +150,10 @@ static void munchStm(T_stm stm)
 		break;
 	}
 	case T_CJUMP: {
+		Temp_temp left_temp = munchExp(stm->u.CJUMP.left);
+		Temp_temp right_temp = munchExp(stm->u.CJUMP.right);
+		//s1 - s2
+		emit(AS_Oper("cmpq `s0, `s1", NULL, Temp_TempList(right_temp,Temp_TempList(left_temp,NULL)),AS_Targets(NULL)));
 		T_relOp op = stm->u.CJUMP.op;
 
 		string tmpStr;

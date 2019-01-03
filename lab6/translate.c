@@ -15,6 +15,7 @@ static F_fragList frags;//code and string
 
 void doPatch(patchList tList, Temp_label label)
 {
+	printf("doPatch: %s\n", Temp_labelstring(label));
 	for(; tList; tList = tList->tail)
 		*(tList->head) = label;
 }
@@ -59,18 +60,18 @@ Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail)
 //for example: flag := (a>b | c<d)
 static T_exp unEx(Tr_exp e)
 {
-	printf("unEx\n");
+	//printf("unEx\n");
 	switch (e->kind) {
 		case Tr_ex:
 			return e->u.ex;
 		case Tr_cx:{
 			Temp_temp r = Temp_newtemp();
-			printf("unEx  1\n");
+			//printf("unEx  1\n");
 			Temp_label t = Temp_newlabel(), f = Temp_newlabel();
-			printf("unEx 2\n");
+			//printf("unEx 2\n");
 			doPatch(e->u.cx.trues, t);
 			doPatch(e->u.cx.falses, f);
-			printf("unEx  3\n");
+			//printf("unEx  3\n");
 			return T_Eseq(T_Move(T_Temp(r), T_Const(1)),
 							T_Eseq(e->u.cx.stm,
 						   T_Eseq(T_Label(f),	//if false jump to here r = 0
@@ -249,19 +250,32 @@ Tr_exp Tr_stringExp(string s)
 	return Tr_Ex(T_Name(lab));
 }
 
+T_expList MakeT_expList(Tr_expList exps)
+{
+	if(exps)
+		return T_ExpList(unEx(exps->head), MakeT_expList(exps->tail));
+	else
+		return NULL;
+}
+
 //pass the static link to callee
 Tr_exp Tr_callExp(Temp_label func, Tr_expList args, Tr_level callerLevel, Tr_level calleeLevel)
 {
 	//trans args
-	T_expList argsTree = NULL; //tail = NULL
-	while(args){
+	T_expList argsTree = MakeT_expList(args); //tail = NULL
+	/*while(args){
 		argsTree = T_ExpList(unEx(args->head), argsTree);
 		args = args->tail;
-	}
+	}*/
 
 	//pass static link
 	T_exp fp = T_Temp(F_FP());//current fp
 	Tr_level calleeParent = calleeLevel->parent;
+
+	if(calleeParent == NULL)
+		//return Tr_Ex(F_externalCall(Temp_labelstring(func), argsTree));
+		return Tr_Ex(T_Call(T_Name(func), T_ExpList(fp, argsTree)));
+
 	Tr_level iterator = callerLevel;
 	while(iterator != calleeParent){
 		fp = T_Mem(T_Binop(T_plus, fp, T_Const(F_wordSize)));
@@ -353,10 +367,13 @@ Tr_exp Tr_assignExp(Tr_exp left, Tr_exp right)
 // bug
 Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee)
 {
-	Temp_label truee = Temp_newlabel(), falsee = Temp_newlabel();
+	Temp_label truee = Temp_newlabel();
+	Temp_label falsee = Temp_newlabel();
 	struct Cx testCx = unCx(test);
-	doPatch(testCx.trues, truee);doPatch(testCx.falses, falsee);
-
+	doPatch(testCx.trues, truee);
+	doPatch(testCx.falses, falsee);
+	printf("Tr_ifExp truee: %s\n", Temp_labelstring(truee));
+	printf("Tr_ifExp flasee: %s\n", Temp_labelstring(falsee));
 	//if-then
 	if(elsee == NULL){
 		//printf("elsee NULL\n");
@@ -364,7 +381,7 @@ Tr_exp Tr_ifExp(Tr_exp test, Tr_exp then, Tr_exp elsee)
 		if(then->kind == Tr_cx)
 			thenStm = then->u.cx.stm;
 		else
-			thenStm = unNx(test);
+			thenStm = unNx(then);
 
 		/*T_stm elseStm;
 		if(elsee->kind == Tr_cx)
@@ -468,6 +485,11 @@ Tr_exp Tr_varDec(Tr_access acc, Tr_exp e)
 	T_stm moveStm = T_Move(addr, unEx(e));
 	printf("Tr_varDec\n");
 	return Tr_Nx(moveStm);
+}
+
+Tr_exp Tr_seq(Tr_exp first, Tr_exp second)
+{
+	return Tr_Ex(T_Eseq(unNx(first), unEx(second)));
 }
 
 //add frag to fraglist

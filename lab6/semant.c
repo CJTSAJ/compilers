@@ -114,7 +114,7 @@ Ty_ty transRecordTy(S_table tenv, A_ty a)
 expty transExp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
 	//if(!a) return expTy(NULL, Ty_Int());
-	printf("transExp: kind: %d\n", a->kind);
+	//printf("transExp: kind: %d\n", a->kind);
 
 	switch (a->kind) {
 		case A_varExp:
@@ -185,13 +185,16 @@ expty transLet(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 	A_decList letDecs = a->u.let.decs;
 
 	S_beginScope(tenv); S_beginScope(venv);
+	Tr_exp dec_exp = Tr_nilExp();
 	while(letDecs){
-		transDec(venv, tenv, letDecs->head, l, lab);
+		dec_exp = Tr_seq(dec_exp, transDec(venv, tenv, letDecs->head, l, lab));
 		letDecs = letDecs->tail;
 	}
-	printf("transLet: after decs\n");
+	//printf("transLet: after decs\n");
 	expty result = transExp(venv, tenv, a->u.let.body, l, lab);
 	S_endScope(venv); S_endScope(tenv);
+
+	result.exp = Tr_seq(dec_exp, result.exp);
 	return result;
 }
 
@@ -223,6 +226,7 @@ expty transFor(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 // break? done?
 expty transWhile(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
+	printf("transWhile\n");
 	A_exp whileTest = a->u.whilee.test;
 	A_exp whileBody = a->u.whilee.body;
 
@@ -243,7 +247,7 @@ expty transWhile(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab
 //then type must be same as else type
 expty transIf(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
-	//printf("transIf\n");
+	printf("transIf\n");
 	A_exp ifTest = a->u.iff.test;
 	A_exp ifThen = a->u.iff.then;
 	A_exp ifElse = a->u.iff.elsee;
@@ -270,7 +274,7 @@ expty transIf(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 
 expty transAssign(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
-	//printf("transAssign: \n");
+	printf("transAssign: \n");
 	A_var assignVar = a->u.assign.var;
 	A_exp assignExp = a->u.assign.exp;
 
@@ -298,11 +302,14 @@ expty transSeq(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 	}
 
 	expty result;
+	Tr_exp result_exp = Tr_nilExp();
 	while(seqExp){
 		result = transExp(venv, tenv, seqExp->head, l, lab);
+		result_exp = Tr_seq(result_exp, result.exp);
 		seqExp = seqExp->tail;
 	}
 
+	result.exp = result_exp;
 	return result;
 }
 //check whether the type of each field of record is same as tyfields
@@ -397,12 +404,12 @@ expty transOp(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 //check whether the type of args is same as formals
 expty transCall(S_table venv, S_table tenv, A_exp a, Tr_level l, Temp_label lab)
 {
-	//printf("transCall: %s\n", S_name(a->u.call.func));
+	printf("transCall: %s\n", S_name(a->u.call.func));
 	S_symbol funcSym = a->u.call.func;
 	A_expList funcArgs = a->u.call.args;
 
 	E_enventry x = S_look(venv, funcSym);
-	if (!x || x->kind != E_funEntry) {
+	if (x == NULL || x->kind != E_funEntry) {
 		EM_error(a->pos, "undefined function %s", S_name(a->u.call.func));
 		return expTy(NULL, Ty_Int());
 	}
@@ -593,7 +600,7 @@ Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 	printf("transVarDec\n");
 	expty initTy = transExp(venv, tenv, d->u.var.init, l, lab);
 	Tr_access acc = Tr_allocLocal(l, d->u.var.escape);
-	printf("transVarDec  1\n");
+	//printf("transVarDec  1\n");
 	if(d->u.var.typ){
 		Ty_ty varTy = S_look(tenv, get_vardec_typ(d));
 
@@ -602,7 +609,7 @@ Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 			EM_error(d->pos, "type mismatch5");
 			return Tr_typeDec();
 		}
-		printf("transVarDec  2\n");
+		//printf("transVarDec  2\n");
 		S_enter(venv, d->u.var.var, E_VarEntry(acc, varTy));
 	}else{
 
@@ -612,7 +619,7 @@ Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 				/*if(actual_ty(initTy.ty)->kind == Ty_array){
 					printf("actual_ty(initTy.ty)->u.array: %x\n", actual_ty(actual_ty(initTy.ty)->u.array));
 				}*/
-				printf("transVarDec  3\n");
+				//printf("transVarDec  3\n");
 				S_enter(venv, d->u.var.var, E_VarEntry(acc, initTy.ty));
 			}
 			else{
@@ -620,12 +627,12 @@ Tr_exp transVarDec(S_table venv, S_table tenv, A_dec d, Tr_level l, Temp_label l
 				return Tr_typeDec();
 			}
 		}else{
-			printf("transVarDec  4\n");
+			//printf("transVarDec  4\n");
 			S_enter(venv, d->u.var.var, E_VarEntry(acc, Ty_Void()));
 		}
 
 	}
-	printf("transVarDec  5\n");
+	//printf("transVarDec  5\n");
 	return Tr_varDec(acc, initTy.exp);
 }
 
@@ -761,13 +768,14 @@ F_fragList SEM_transProg(A_exp exp)
 	S_table venv = E_base_venv();
 	S_table tenv = E_base_tenv();
 
+	E_enventry x = S_look(venv, S_Symbol("printi"));
+	if(x == NULL) printf("printi node exist\n");
 	Temp_label startLab = Temp_newlabel();
 
 	Tr_level OMLevel = Tr_outermost();
 
 	//printf("%d\n", OMLevel->frame->stackOff);
 	expty tranExp = transExp(venv, tenv, exp, OMLevel, startLab);
-	printf("after transExp\n");
 	Tr_procEntryExit(OMLevel, tranExp.exp);
 
 	return Tr_getResult();

@@ -91,6 +91,7 @@ Tr_exp Tr_breakExp(Temp_label doneLab);
 Tr_exp Tr_arrayExp(Tr_exp size, Tr_exp init);
 Tr_exp Tr_typeDec();
 Tr_exp Tr_varDec(Tr_access acc, Tr_exp e);
+Tr_exp Tr_seq(Tr_exp first, Tr_exp second);
 void Tr_procEntryExit(Tr_level level, Tr_exp body);
 F_fragList Tr_getResult(void);
 #endif

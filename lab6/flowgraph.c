@@ -21,10 +21,12 @@ Temp_tempList FG_def(G_node n) {
 	case I_OPER:
 		return ins->u.OPER.dst;
 	case I_LABEL:
+		printf("I_LABEL\n");
 		assert(0);
 	case I_MOVE:
 		return ins->u.MOVE.dst;
 	default:
+		printf("default\n");
 		assert(0);
 	}
 	assert(0);
