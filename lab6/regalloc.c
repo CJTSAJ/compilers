@@ -78,9 +78,11 @@ AS_instrList RewriteProgram(F_frame f, AS_instrList il, Temp_tempList spills)
 struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
 	//your code here
 	G_graph flow_graph = FG_AssemFlowGraph(il, f);
+	printf("RA_regAlloc flow_graph done\n");
 	struct Live_graph live_graph = Live_liveness(flow_graph);
+	printf("RA_regAlloc live_graph done\n");
 	struct COL_result col_result = COL_color(live_graph.graph, F_tempMap, NULL, live_graph.moves);
-
+	printf("RA_regAlloc COL_color done\n");
 	while (col_result.spills != NULL) {
 		AS_instrList new_il = RewriteProgram(f, il, col_result.spills);
 		return RA_regAlloc(f, new_il);

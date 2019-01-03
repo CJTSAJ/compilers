@@ -54,13 +54,17 @@ static G_graph TempGraph(G_graph flow, TAB_table inOutTab, TAB_table temp2NodeTa
 		Temp_tempList defs = FG_def(tmp_nodes->head);
 		Temp_tempList uses = FG_use(tmp_nodes->head);
 		for (; defs; defs = defs->tail) {
-			G_node tmp_node = G_Node(conflictGraph, defs->head);
-			TAB_enter(temp2NodeTab, defs->head, tmp_node);
+			if(TAB_look(temp2NodeTab, defs->head) == NULL){
+				G_node tmp_node = G_Node(conflictGraph, defs->head);
+				TAB_enter(temp2NodeTab, defs->head, tmp_node);
+			}
 		}
 
 		for (; uses; uses = uses->tail) {
-			G_node tmp_node = G_Node(conflictGraph, uses->head);
-			TAB_enter(temp2NodeTab, uses->head, tmp_node);
+			if(TAB_look(temp2NodeTab, uses->head) == NULL){
+				G_node tmp_node = G_Node(conflictGraph, uses->head);
+				TAB_enter(temp2NodeTab, uses->head, tmp_node);
+			}
 		}
 
 		//generate a revers nodeList for loop analysis
@@ -79,7 +83,8 @@ static void LivenessCompute(TAB_table inOutTab)
 {
 
 	//first compute out then in
-	while (TRUE) {
+	bool finish = FALSE;
+	while (!finish) {
 		for (G_nodeList it = reverse; it; it = it->tail) {
 			liveInOut old_inOut = (liveInOut)TAB_look(inOutTab, it->head);
 
@@ -95,7 +100,7 @@ static void LivenessCompute(TAB_table inOutTab)
 
 			//check unchangable
 			if (TL_SAME(old_inOut->in, new_in) && TL_SAME(old_inOut->out, new_out))
-				break;
+				finish = TRUE;
 
 			//fresh the in-out table
 			old_inOut->in = new_in;
@@ -109,15 +114,23 @@ static void LivenessCompute(TAB_table inOutTab)
 static void confEdge(TAB_table temp2NodeTab, TAB_table inOutTab)
 {
 	for (G_nodeList nodes = reverse; nodes; nodes = nodes->tail) {
+		//printf("confEdge 1\n");
 		//movelist, use the same reg if it work
 		if (FG_isMove(nodes->head)) {
+
 			Temp_temp temp_dst = FG_def(nodes->head)->head;
+			//printf("1\n");
 			Temp_temp temp_src = FG_use(nodes->head)->head;
+			//printf("2\n");
 			G_node dst_node = (G_node)TAB_look(temp2NodeTab, temp_dst);
+			//printf("3\n");
 			G_node src_node = (G_node)TAB_look(temp2NodeTab, temp_src);
+			//printf("4\n");
 			moves = Live_MoveList(src_node, dst_node, moves);
+			//printf("5\n");
 		}
 
+		//printf("confEdge 2\n");
 		//add conflict edge: defs conflict with out
 		Temp_tempList temp_defs = FG_def(nodes->head);
 		liveInOut temp_inOut = TAB_look(inOutTab, nodes->head);
@@ -126,31 +139,35 @@ static void confEdge(TAB_table temp2NodeTab, TAB_table inOutTab)
 			G_node node1 = (G_node)TAB_look(temp2NodeTab, it_defs->head);
 			for (Temp_tempList outs = temp_inOut->out; outs; outs = outs->tail) {
 				G_node node2 = (G_node)TAB_look(temp2NodeTab, outs->head);
-				G_addEdge(node1, node2);
+				if(node1 != node2 && !G_goesTo(node1, node2))
+					G_addEdge(node1, node2);
 			}
 
 		}
+
+		//printf("confEdge 3\n");
 	}
 }
 
 // Live_graph: G_graph Live_moveList
 // every node has preds and succs
-struct Live_graph Live_liveness(G_graph flow) {
+struct Live_graph Live_liveness(G_graph flow)
+{
 	//your code here.
 	reverse = NULL; //reverse nodelist, and node info point to AS_instr
 	TAB_table inOutTab = TAB_empty(); //map flowNode to in-out
 	TAB_table temp2NodeTab = TAB_empty(); //map temp to node
 	moves = NULL;
-
+	printf("Live_liveness init\n");
 	//generate conflict graph without edge
 	G_graph conflictGraph = TempGraph(flow, inOutTab, temp2NodeTab);
-
+	printf("Live_liveness conflictGraph done\n");
 	//loop analysis until unchangable
 	LivenessCompute(inOutTab);
-
+	printf("Live_liveness LivenessCompute done\n");
 	//add conflict edge for conflictGraph
 	confEdge(temp2NodeTab, inOutTab);
-
+	printf("Live_liveness confEdge done\n");
 	struct Live_graph lg;
 	lg.graph = conflictGraph;
 	lg.moves = moves;

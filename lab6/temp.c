@@ -93,6 +93,8 @@ Temp_temp Temp_newtemp(void)
  p->num=temps++;
  {char r[16];
   sprintf(r, "%d", p->num);
+	if(p->num == 101)
+		printf("Temp_newtemp 101\n");
   Temp_enter(Temp_name(), p, String(r));
  }
  return p;

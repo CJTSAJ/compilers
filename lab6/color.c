@@ -48,6 +48,7 @@ static Live_moveList DiffMoveList(Live_moveList moves1, Live_moveList moves2);
 static bool InMoveList(Live_moveList moves, G_node src, G_node dst);
 static Live_moveList NodeMoves(G_node n);
 static G_nodeList RemoveNodeList(G_nodeList nodes, G_node n);
+static void printNodeList(G_nodeList nodes);
 
 //the adjacent nodes of the node
 static G_nodeList Adjacent(G_node n)
@@ -74,12 +75,17 @@ static void EnableMoves(G_nodeList nodes)
 //reduce the degree of node
 static void DecrementDegree(G_node node)
 {
-	int* tmp_degree = (int*)G_look(degree, node);
+	printf("DecrementDegree:");
+	printNodeList(G_NodeList(node, NULL));
+	int* tmp_degree = G_look(degree, node);
+	assert(tmp_degree != NULL);
 	(*tmp_degree)--;
 
 	//if K-1 add to simplify, if < K-1, it is related with move
 	if ((*tmp_degree) == (K - 1)) {
+		//printf("DecrementDegree 2\n");
 		EnableMoves(G_NodeList(node, Adjacent(node)));
+		//printf("DecrementDegree 3\n");
 		spillWorklist = RemoveNodeList(spillWorklist, node); //remove the node from spillWorklist
 		if (MoveRelated(node))
 			freezeWorklist = G_NodeList(node, freezeWorklist);
@@ -251,16 +257,20 @@ static void AddEdge(G_node u, G_node v)
 static void Combine(G_node u, G_node v)
 {
 	if (InNodeList(freezeWorklist, v))
-		freezeWorklist = RemoveNodeList(freezeWorklist, v);
+		freezeWorklist = DiffNodeList(freezeWorklist, G_NodeList(v, NULL));
 	else
-		spillWorklist = RemoveNodeList(spillWorklist, v);
+		spillWorklist = DiffNodeList(spillWorklist, G_NodeList(v, NULL));
 
+	printf("combine remove\n");
 	coalescedNodes = G_NodeList(v, coalescedNodes);
 	G_enter(alias, v, u);
-
+	printf("combine 1\n");
 	for (G_nodeList adj = Adjacent(v); adj; adj = adj->tail) {
+		printf("combine 3\n");
 		AddEdge(adj->head, u);
+		printf("combine 4\n");
 		DecrementDegree(adj->head);
+		printf("combine 5\n");
 	}
 
 	//check the u node, fresh the freezeWorklist and spillWorklist
@@ -269,6 +279,18 @@ static void Combine(G_node u, G_node v)
 		freezeWorklist = RemoveNodeList(freezeWorklist, u);
 		spillWorklist = G_NodeList(u, spillWorklist);
 	}
+}
+
+static bool Conservative(G_nodeList nodes)
+{
+	int k = 0;
+	for(;nodes;nodes = nodes->tail){
+		int* degree_num = (int*)G_look(degree, nodes->head);
+		if((*degree_num) >= K)
+			k++;
+	}
+
+	return k < K;
 }
 
 static void Coalesce()
@@ -284,24 +306,30 @@ static void Coalesce()
 		u = GetAlias(x);
 		v = GetAlias(y);
 	}
-
+	printf("Coalesce 1\n");
 	worklistMoves = worklistMoves->tail; //delete the node
 
 	if (u == v) {
+		printf("Coalesce 2\n");
 		coalescedMoves = Live_MoveList(x, y, coalescedMoves);
 		AddWorklist(u);
 	}
-	else if (InNodeList(precolored, v) || InNodeList(G_adj(u), v)) {
+	else if (InNodeList(precolored, v) || InNodeList((G_nodeList)G_look(adjList, u), v)) {
+		printf("Coalesce 3\n");
 		constrainedMoves = Live_MoveList(x, y, constrainedMoves);
 		AddWorklist(u);
 		AddWorklist(v);
 	}
-	else if (InNodeList(precolored, u) && OK(v, u)) { //whether to combine
+	else if ((InNodeList(precolored, u) && OK(v, u)) ||
+						(!InNodeList(precolored, u), Conservative(UnionNodeList(Adjacent(u),Adjacent(v))))) { //whether to combine
+		printf("Coalesce 4\n");
 		coalescedMoves = Live_MoveList(x, y, coalescedMoves);
 		Combine(u, v);
 		AddWorklist(u);
+
 	}
 	else {
+		printf("Coalesce 5\n");
 		activeMoves = Live_MoveList(x, y, activeMoves);
 	}
 }
@@ -369,6 +397,7 @@ static void SelectSpill()
 
 static void AssignColors()
 {
+	printf("AssignColors\n");
 	while (selectStack) {
 		//pop the stack
 		G_node n = selectStack->head;
@@ -381,7 +410,7 @@ static void AssignColors()
 
 		for (G_nodeList adj = G_look(adjList, n); adj; adj = adj->tail) {
 			int* tmp_color = G_look(color, adj->head);
-			okColors[*tmp_color] = FALSE;
+			if(tmp_color != NULL) okColors[*tmp_color] = FALSE;
 		}
 
 		//select color num
@@ -395,15 +424,24 @@ static void AssignColors()
 		}
 
 		if (have_color) {
-			*(int*)G_look(color, n) = color_num;
+			coloredNodes = G_NodeList(n, coloredNodes);
+			int * tmp_color = checked_malloc(sizeof(int));
+			G_enter(color, n, tmp_color);
 		}
 		else {
 			spilledNodes = G_NodeList(n, spilledNodes);
 		}
 	}
+
+	G_nodeList nodes = coalescedNodes;
+	for(;nodes;nodes = nodes->tail){
+		int* color_num = G_look(color, GetAlias(nodes->head));
+		assert(color_num);
+		G_enter(color, nodes->head, color_num);
+	}
 }
 
-static void Build(G_graph ig, Temp_map allregs)
+static void Build(G_graph ig, Temp_map allregs, Live_moveList moves)
 {
 	G_nodeList nodes = G_nodes(ig);
 
@@ -491,23 +529,36 @@ static void Build(G_graph ig, Temp_map allregs)
 		}
 	}
 
+	//printf("build precolored done\n");
 	//adjList and degree
 	nodes = G_nodes(ig);
+	/*printf("====================nodes========================\n");
+	printNodeList(nodes);*/
 	for (; nodes; nodes = nodes->tail) {
 		G_nodeList adjs = G_adj(nodes->head);
 		G_enter(adjList, nodes->head, adjs);
 
 		//degree
-		int* degree_num = (int*)checked_malloc(sizeof(int));
+		int* degree_num = checked_malloc(sizeof(int));
 		*degree_num = 0;
 		for (; adjs; adjs = adjs->tail)
-			*degree_num++;
+			(*degree_num)++;
 
 		G_enter(degree, nodes->head, degree_num);
 	}
 
+	//printf("build degree done\n");
+
+	//init worklistMoves
+	Live_moveList tmp_moves = moves;
+	for(; tmp_moves; tmp_moves = tmp_moves->tail){
+		if(tmp_moves->src != tmp_moves->dst && !InMoveList(worklistMoves, tmp_moves->src, tmp_moves->dst)){
+			worklistMoves = Live_MoveList(tmp_moves->src, tmp_moves->dst, worklistMoves);
+		}
+	}
+
 	//init moveList: the moves related to a node
-	Live_moveList tmp_moves = worklistMoves;
+	tmp_moves = worklistMoves;
 	for (; tmp_moves; tmp_moves = tmp_moves->tail) {
 		Live_moveList old_src_move = G_look(moveList, tmp_moves->src);
 		Live_moveList old_dst_move = G_look(moveList, tmp_moves->dst);
@@ -515,6 +566,8 @@ static void Build(G_graph ig, Temp_map allregs)
 		G_enter(moveList, tmp_moves->src, Live_MoveList(tmp_moves->src, tmp_moves->dst, old_src_move));
 		G_enter(moveList, tmp_moves->dst, Live_MoveList(tmp_moves->src, tmp_moves->dst, old_dst_move));
 	}
+
+	//printf("build moveList done\n");
 }
 
 static void MakeWorklist()
@@ -530,9 +583,31 @@ static void MakeWorklist()
 			freezeWorklist = G_NodeList(initial->head, freezeWorklist);
 		}
 		else {
-			simplifyWorklist = G_NodeList(initial->head, simplifyWorklist);
+			if(!InNodeList(simplifyWorklist, initial->head))
+				simplifyWorklist = G_NodeList(initial->head, simplifyWorklist);
 		}
 	}
+}
+
+static void printNodeList(G_nodeList nodes)
+{
+	Temp_map tmp_map = Temp_layerMap(F_tempMap, Temp_name());
+
+	for(;nodes;nodes = nodes->tail){
+		printf("%s, ", Temp_look(tmp_map, (Temp_temp)G_nodeInfo(nodes->head)));
+	}
+	printf("\n");
+}
+
+static void printMoveList(Live_moveList moves)
+{
+	Temp_map tmp_map = Temp_layerMap(F_tempMap, Temp_name());
+
+	for(;moves;moves = moves->tail){
+		printf("%s->%s, ", Temp_look(tmp_map, (Temp_temp)G_nodeInfo(moves->src)),
+												Temp_look(tmp_map, (Temp_temp)G_nodeInfo(moves->dst)));
+	}
+	printf("\n");
 }
 
 struct COL_result COL_color(G_graph ig, Temp_map allregs, Temp_tempList regs, Live_moveList moves) {
@@ -552,30 +627,61 @@ struct COL_result COL_color(G_graph ig, Temp_map allregs, Temp_tempList regs, Li
 	coalescedMoves = NULL;
 	constrainedMoves = NULL;
 	frozenMoves = NULL;
-	worklistMoves = moves;
+	worklistMoves = NULL;
 	activeMoves = NULL;
 
 	degree = G_empty();
 	alias = G_empty();
 	moveList = G_empty();
 	color = G_empty();
+	adjList = G_empty();
 
-	Build(ig, allregs);
+	Build(ig, allregs, moves);
+	printf("COL_color Build done\n");
 	MakeWorklist();
-
+	printf("COL_color MakeWorklist done\n");
 	while (simplifyWorklist || worklistMoves || freezeWorklist || spillWorklist) {
-		if (simplifyWorklist)
+		printf("==========================show info========================\n");
+		printf("simplifyWorklist\n");
+		printNodeList(simplifyWorklist);
+		printf("worklistMoves\n");
+		printMoveList(worklistMoves);
+		printf("freezeWorklist\n");
+		printNodeList(freezeWorklist);
+		printf("spillWorklist\n");
+		printNodeList(spillWorklist);
+		printf("spilledNodes\n");
+		printNodeList(spilledNodes);
+
+		printf("coalescedNodes\n");
+		printNodeList(coalescedNodes);
+		printf("selectStack\n");
+		printNodeList(selectStack);
+		printf("coalescedMoves\n");
+		printMoveList(coalescedMoves);
+		printf("constrainedMoves\n");
+		printMoveList(constrainedMoves);
+
+		if (simplifyWorklist){
+			printf("Simplify\n");
 			Simplify();
-		else if (worklistMoves)
+		}
+		else if (worklistMoves){
+			printf("Coalesce\n");
 			Coalesce();
-		else if (freezeWorklist)
+		}
+		else if (freezeWorklist){
+			printf("Freeze\n");
 			Freeze();
-		else if (spillWorklist)
+		}
+		else if (spillWorklist){
+			printf("SelectSpill\n");
 			SelectSpill();
+		}
 	}
-
+	printf("COL_color loop done\n");
 	AssignColors();
-
+	printf("COL_color AssignColors done\n");
 	//coloring
 	Temp_map coloring = Temp_empty();
 	G_nodeList colored_nodes = UnionNodeList(coloredNodes, coalescedNodes);

@@ -34,20 +34,20 @@ static void emit(AS_instr inst)
 	else last = iList = AS_InstrList(inst, NULL); //first add
 }
 
-//
+//index = 0 is the static link
 static Temp_tempList munchArgs(T_expList args, int index)
 {
 	if (!args) return NULL;
 
 	Temp_temp src = munchExp(args->head);
-	if (index < 6) {
-		Temp_temp dst_reg = F_ArgReg(index);
-		Temp_tempList temp_args = Temp_TempList(dst_reg, munchArgs(args->tail, index));
+	if (index < 7 && index != 0) {
+		Temp_temp dst_reg = F_ArgReg(index - 1);
+		Temp_tempList temp_args = Temp_TempList(dst_reg, munchArgs(args->tail, index + 1));
 		emit(AS_Move("movq `s0, `d0", Temp_TempList(dst_reg, NULL), Temp_TempList(src, NULL)));
 		return temp_args;
 	}
 	else {
-		emit(AS_Oper("pushq `s0", Temp_TempList(F_RSP(),NULL), Temp_TempList(src, Temp_TempList(F_RSP(), NULL)), AS_Targets(NULL)));
+		emit(AS_Oper("pushq `s0", Temp_TempList(F_RSP(),NULL), Temp_TempList(src, Temp_TempList(F_RSP(), NULL)), NULL));
 		return munchArgs(args->tail, index + 1);;
 	}
 }
@@ -95,26 +95,27 @@ static Temp_temp munchExp(T_exp exp)
 		emit(AS_Oper("movq (`s0), `d0", Temp_TempList(result, NULL), Temp_TempList(munchExp(exp->u.MEM), NULL), NULL));
 		break;
 	case T_TEMP: {
-		if (exp->u.TEMP == F_FP()) { //FP = rps + framesize
+		/*if (exp->u.TEMP == F_FP()) { //FP = rps + framesize
 			emit(AS_Oper("movq `s0, `d0", Temp_TempList(result, NULL), Temp_TempList(F_RSP(), NULL), AS_Targets(NULL)));
 			char * inst = checked_malloc(MAXNUM * sizeof(char));
 			sprintf(inst, "addq $%sframesize, `d0", Temp_labelstring(F_name(frame)));
 			emit(AS_Oper(inst, Temp_TempList(result, NULL), NULL, AS_Targets(NULL)));
 		}
-		else result = exp->u.TEMP;
+		else result = exp->u.TEMP;*/
+		result = exp->u.TEMP;
 		break;
 	}
 	case T_ESEQ: assert(0); //no ESEQ
 	case T_NAME: {
 		char* tmp_ins = checked_malloc(MAXNUM);
-		sprintf(tmp_ins, "movq $%s, `d0", Temp_labelstring(exp->u.NAME));
-		emit(AS_Move(tmp_ins, Temp_TempList(result, NULL), NULL));
+		sprintf(tmp_ins, "leaq %s, `d0", Temp_labelstring(exp->u.NAME));
+		emit(AS_Oper(tmp_ins, Temp_TempList(result, NULL), NULL, NULL));
 		break;
 	}
 	case T_CONST: {
 		char* tmp_ins = checked_malloc(MAXNUM);
 		sprintf(tmp_ins, "movq $%d, `d0", exp->u.CONST);
-		emit(AS_Move(tmp_ins, Temp_TempList(result, NULL), NULL));
+		emit(AS_Oper(tmp_ins, Temp_TempList(result, NULL), NULL, NULL));
 		break;
 	}
 	case T_CALL: {
@@ -153,7 +154,7 @@ static void munchStm(T_stm stm)
 		Temp_temp left_temp = munchExp(stm->u.CJUMP.left);
 		Temp_temp right_temp = munchExp(stm->u.CJUMP.right);
 		//s1 - s2
-		emit(AS_Oper("cmpq `s0, `s1", NULL, Temp_TempList(right_temp,Temp_TempList(left_temp,NULL)),AS_Targets(NULL)));
+		emit(AS_Oper("cmpq `s0, `s1", NULL, Temp_TempList(right_temp,Temp_TempList(left_temp,NULL)),NULL));
 		T_relOp op = stm->u.CJUMP.op;
 
 		string tmpStr;
@@ -208,12 +209,12 @@ static void munchStm(T_stm stm)
 			T_exp tmpMem = dst->u.MEM;
 			switch (tmpMem->kind){
 			case T_TEMP: {
-				emit(AS_Move("movq `s0 (`s1)", NULL, Temp_TempList(temp_src, Temp_TempList(tmpMem->u.TEMP, NULL))));
+				emit(AS_Oper("movq `s0 (`s1)", NULL, Temp_TempList(temp_src, Temp_TempList(tmpMem->u.TEMP, NULL)), NULL));
 				break;
 			}
 			case T_CONST: {
 				Temp_temp cons = munchExp(tmpMem);
-				emit(AS_Move("MOVQ `s0 (`s1)", NULL, Temp_TempList(temp_src, Temp_TempList(cons, NULL))));
+				emit(AS_Oper("movq `s0 (`s1)", NULL, Temp_TempList(temp_src, Temp_TempList(cons, NULL)), NULL));
 				break;
 			}
 			case T_BINOP: { //BINOP(o, e1, e2)
@@ -270,22 +271,22 @@ AS_instrList F_codegen(F_frame f, T_stmList stmList) {
 	for (; formals; formals = formals->tail, index++) {
 		Temp_temp arg_temp;
 		switch (index) {
-			case 0:
+			case 1:
 				arg_temp = F_RDI();
 				break;
-			case 1:
+			case 2:
 				arg_temp = F_RSI();
 				break;
-			case 2:
+			case 3:
 				arg_temp = F_RDX();
 				break;
-			case 3:
+			case 4:
 				arg_temp = F_RCX();
 				break;
-			case 4:
+			case 5:
 			  arg_temp = F_R8();
 				break;
-			case 5:
+			case 6:
 				arg_temp = F_R9();
 				break;
 			default:
@@ -333,6 +334,11 @@ AS_instrList F_codegen(F_frame f, T_stmList stmList) {
 	emit(StoreTemp(r14_temp, F_R14()));
 	emit(StoreTemp(r15_temp, F_R15()));
 	emit(StoreTemp(rbx_temp, F_RBX()));
+	emit(StoreTemp(F_RBP(), F_RSP()));
+
+	//return
+	emit(AS_Oper("ret", NULL, Temp_TempList(F_RSP(),Temp_TempList(F_R12(),Temp_TempList(F_R13(),
+																		Temp_TempList(F_R14(),Temp_TempList(F_R15(),Temp_TempList(F_RBX(),NULL)))))),NULL));
 
 	return iList;
 }

@@ -206,7 +206,7 @@ Tr_accessList Tr_formals(Tr_level level)
 Tr_exp Tr_simpleVar(Tr_access acc, Tr_level l)
 {
 	printf("Tr_simpleVar\n");
-	T_exp fp = T_Temp(F_FP());
+	T_exp fp = T_Binop(T_plus, T_Temp(F_FP()), T_Const(0));
 	while(acc->level != l){ //track up
 		//static link in a word off fp
 		fp = T_Mem(T_Binop(T_plus, fp, T_Const(F_wordSize)));
@@ -269,7 +269,7 @@ Tr_exp Tr_callExp(Temp_label func, Tr_expList args, Tr_level callerLevel, Tr_lev
 	}*/
 
 	//pass static link
-	T_exp fp = T_Temp(F_FP());//current fp
+	T_exp fp = T_Binop(T_plus, T_Temp(F_FP()), T_Const(0));//current fp
 	Tr_level calleeParent = calleeLevel->parent;
 
 	if(calleeParent == NULL)
